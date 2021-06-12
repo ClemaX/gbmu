@@ -1,4 +1,4 @@
-NAME = skeleton
+NAME = gbmu 
 
 # Compiler and linker
 CXX = clang++
