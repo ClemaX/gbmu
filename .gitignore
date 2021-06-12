@@ -1,0 +1,12 @@
+# C/CPP Binaries
+skeleton
+obj/
+*.out
+*.o
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/*
+!.vscode/c_cpp_properties.json
