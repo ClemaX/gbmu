@@ -1,11 +1,12 @@
-NAME = gbmu 
+NAME = gbmu
 
 # Compiler and linker
 CXX = clang++
 LD = clang++
 
 # Paths
-SRCDIR = src
+include srcs.mk
+
 INCDIR = include
 LIBDIR = ..
 
