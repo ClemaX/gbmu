@@ -5,26 +5,29 @@
 
 #include <emulation/IMMU.hpp>
 
+#include <iostream>
+
 namespace emulation
 {
 	template<typename Data = uint8_t, typename Size = std::uintptr_t>
-	class ARAM:	public IMMU<Data>
+	class RAM:	public IMMU<Data>
 	{
 	private:
 		Data*	data;
 		Size	size;
 
 	public:
-		ARAM()
+		RAM()
 			:	data(nullptr),
 				size(0)
 		{
 		}
 
-		ARAM(Size size)
+		RAM(Size size)
 			:	data(new Data[size]),
 				size(size)
 		{
+			std::cerr << "Creating RAM of size " << size << "!" << std::endl;
 		}
 
 		Data	read(Size address) const
@@ -46,7 +49,7 @@ namespace emulation
 		Size	getSize() const noexcept
 		{ return size; }
 
-		ARAM&	operator=(ARAM const& rhs)
+		RAM&	operator=(RAM const& rhs)
 		{
 			if (this != &rhs)
 			{
@@ -60,7 +63,7 @@ namespace emulation
 			}
 		}
 
-		virtual ~ARAM()
+		virtual ~RAM()
 		{
 			delete[] data;
 		}
