@@ -1,34 +1,21 @@
 #pragma once
 
-#include <cstddef>
 #include <cstring>
 
 #include <emulation/IMMU.hpp>
 
-#include <iostream>
-
 namespace emulation
 {
-	template<typename Data = uint8_t, typename Size = std::uintptr_t>
-	class RAM:	public IMMU<Data>
+	template<typename Data, typename Size, Size size>
+	class RAM:	public IMMU<Data, Size>
 	{
 	private:
 		Data*	data;
-		Size	size;
 
 	public:
 		RAM()
-			:	data(nullptr),
-				size(0)
-		{
-		}
-
-		RAM(Size size)
-			:	data(new Data[size]),
-				size(size)
-		{
-			std::cerr << "Creating RAM of size " << size << "!" << std::endl;
-		}
+			:	data(new Data[size])
+		{ }
 
 		Data	read(Size address) const
 		{

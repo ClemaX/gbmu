@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace	emulation
 {
 	/// To be thrown to emulate segmentation fault
@@ -14,7 +12,7 @@ namespace	emulation
 	 * @tparam Data:	Data type.
 	 * @tparam Size:	Size type.
 	 */
-	template<typename Data = uint8_t, typename Size = std::uintptr_t>
+	template<typename Data, typename Size>
 	class IMMU
 	{
 	public:

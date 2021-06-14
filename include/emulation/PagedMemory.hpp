@@ -8,7 +8,14 @@
 
 namespace emulation
 {
-	template<typename Data = uint8_t, typename Size = uintptr_t>
+	/**
+	 * @brief Paged memory manager.
+	 *
+	 * @tparam Data:	Data type.
+	 * @tparam Size:	Size type.
+	 * @tparam size:	Total size of the virtual address space.
+	 */
+	template<typename Data, typename Size, Size size>
 	class	PagedMemory:	public IMMU<Data, Size>
 	{
 	public:
@@ -68,7 +75,6 @@ namespace emulation
 		typedef	std::deque<Page>	page_container;
 
 		page_container	pages;
-		Size			size;
 
 		/**
 		 * @brief Get the page's iterator for the given offset.
@@ -100,8 +106,10 @@ namespace emulation
 
 
 	public:
-		PagedMemory(Size size)
-			:	size(size)
+		/**
+		 * @brief Construct a new Paged Memory object.
+		 */
+		PagedMemory()
 		{ }
 
 		/**
