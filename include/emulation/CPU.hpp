@@ -60,10 +60,10 @@ namespace GBMU_NAMESPACE {
 		bool			isValid()
 		{
 			return (
-				   this->getX() < OPCODE_X_SZMAX \
-				&& this->getY() < OPCODE_Y_SZMAX \
-				&& this->getZ() < OPCODE_Z_SZMAX \
-				&& this->getP() < OPCODE_P_SZMAX \
+				   this->getX() < OPCODE_X_SZMAX
+				&& this->getY() < OPCODE_Y_SZMAX
+				&& this->getZ() < OPCODE_Z_SZMAX
+				&& this->getP() < OPCODE_P_SZMAX
 				&& this->getQ() < OPCODE_Q_SZMAX
 			);
 		}
@@ -468,6 +468,9 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: ? ( CCF )
 
 
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
 		/// Opcode: ? ( LD B, B )
 		static void operLD_BinB(const CPU<Memory, Z80Registers, uint8_t>& core)
 		{ static_cast<void>(core); }
