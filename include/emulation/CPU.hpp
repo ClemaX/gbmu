@@ -6,7 +6,7 @@
 # include <cstdint>
 # include <exception>
 
-# define PREFIX_XMASK 0b11000000 
+# define PREFIX_XMASK 0b11000000
 # define PREFIX_YMASK 0b00111000
 # define PREFIX_ZMASK 0b00000111
 
@@ -42,8 +42,8 @@ namespace GBMU_NAMESPACE {
 		opcode_byte_t 	getX() const { return this->unprefixedValue & PREFIX_XMASK; }
 		opcode_byte_t 	getY() const  { return this->unprefixedValue & PREFIX_YMASK; }
 		opcode_byte_t 	getZ() const  { return this->unprefixedValue & PREFIX_ZMASK; }
-		int8_t			getPrefixFamily() const { return this->prefixFamily; } 
-		
+		int8_t			getPrefixFamily() const { return this->prefixFamily; }
+
 		Opcode(opcode_t opcode)
 		: prefixedValue(opcode),
 		unprefixedValue(static_cast<opcode_byte_t>(opcode))
@@ -77,108 +77,158 @@ namespace GBMU_NAMESPACE {
 					throw OpcodeInitializerException();
 			}
 		}
+
+		~Opcode() { }
     };
 
-	template <class Memory>
-    class CPU
-    {
-		typedef int8_t		reg8_t;
-		typedef uint8_t 	ureg8_t;
-		typedef int16_t 	reg16_t;
-		typedef uint16_t	ureg16_t;
+	struct Z80Registers
+	{
+		// | 15-8| 0-7 |
+		// +-+-+-+-+-+-+
+		// |  A  |  F  |
+		// +-+-+-+-+-+-+
+		// |  B  |  C  |
+		// +-+-+-+-+-+-+
+		// |  D  |  E  |
+		// +-+-+-+-+-+-+
+		// |  H  |  L  |
+		// +-+-+-+-+-+-+
+		// |     SP    |
+		// +-+-+-+-+-+-+
+		// |     PC    |
+		// +-+-+-+-+-+-+
 
-		struct Registers
+		typedef int8_t		word_t;
+		typedef uint8_t 	uword_t;
+		typedef int16_t 	dword_t;
+		typedef uint16_t	udword_t;
+
+		union
 		{
-			// | 15-8| 0-7 |
-			// +-+-+-+-+-+-+
-			// |  A  |  F  |
-			// +-+-+-+-+-+-+
-			// |  B  |  C  |
-			// +-+-+-+-+-+-+
-			// |  D  |  E  |
-			// +-+-+-+-+-+-+
-			// |  H  |  L  |
-			// +-+-+-+-+-+-+
-			// |     SP    |
-			// +-+-+-+-+-+-+
-			// |     PC    |
-			// +-+-+-+-+-+-+
-
-			union
+			udword_t af;
+			struct
 			{
-				ureg16_t af;
-				struct
-				{
-					ureg8_t a;
-					ureg8_t f;
+				uword_t a;
+				uword_t f;
 
-				};
-				
-			};
-			
-			union
-			{
-				ureg16_t bc;
-				struct
-				{
-					ureg8_t b;
-					ureg8_t c;
-				};
 			};
 
-			union
-			{
-				ureg16_t de;
-				struct
-				{
-					ureg8_t d;
-					ureg8_t e;
-				};
-			};
-
-			union
-			{
-				ureg16_t hl;
-				struct
-				{
-					ureg8_t h;
-					ureg8_t l;
-				};
-			};
-
-			reg16_t sp;
-			reg16_t pc;
-
-			Registers() : af(0), bc(0), de(0), hl(0), sp(0 /* to do */), pc(0X100) { }
 		};
 
-		typedef Registers reg_t;
+		union
+		{
+			udword_t bc;
+			struct
+			{
+				uword_t b;
+				uword_t c;
+			};
+		};
 
-		typedef int8_t flags_t;
+		union
+		{
+			udword_t de;
+			struct
+			{
+				uword_t d;
+				uword_t e;
+			};
+		};
 
-		enum {
-			FLAG_BIT0		= (1 << 0),
+		union
+		{
+			udword_t hl;
+			struct
+			{
+				uword_t h;
+				uword_t l;
+			};
+		};
+
+		udword_t sp;
+		udword_t pc;
+
+		Z80Registers(ptrdiff_t stackstart, ptrdiff_t entrypoint = 0X100)
+		: af(0), bc(0), de(0), hl(0), sp(stackstart), pc(entrypoint)
+		{ }
+	};
+
+	template <class Memory, class Registers, typename Flags>
+	class CPU
+	{
+		protected:
+
+		typedef Memory		mem_t;
+		typedef Registers	reg_t;
+		typedef Flags		flags_t;
+
+		typedef CPU<Memory, Registers, Flags> cpu_t;
+
+		mem_t	memory;
+		reg_t	regs;
+		flags_t	flags;
+
+		CPU(const mem_t& mem, const reg_t& registers, flags_t flagsCt)
+		: memory(mem), regs(regs), flags(flagsCt)
+		{ }
+
+		CPU(const mem_t&& mem, const reg_t&& registers, flags_t flagsCt)
+		: memory(mem), regs(regs), flags(flagsCt)
+		{ }
+
+		CPU(const CPU& other)
+		: memory(other.mem), regs(other.regs), flags(other.flagsCt)
+		{ }
+
+		CPU(const CPU&& other)
+		: memory(other.mem), regs(other.regs), flags(other.flagsCt)
+		{ }
+
+		CPU&
+		operator=(const CPU& other)
+		{
+			if (this != &other)
+			{
+				this->memory = other.memory;
+				this->regs = other.regs;
+				this->flags = other.flags;
+			}
+			return *this;
+		}
+
+		~CPU()
+		{ }
+	};
+
+	template <class Memory>
+    class CPUZ80
+	: protected CPU<Memory, Z80Registers, uint8_t>
+    {
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+		// | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+		// | Z | N | H | C | 0 | 0 | 0 | 0 |
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+		enum
+		{
+			FLAG_ZERO		= (1 << 0),
+			FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
+			FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
+			FLAG_CARRY		= (FLAG_HALF_CARRY << 1),
+			FLAG_BIT0		= (FLAG_CARRY << 1),
 			FLAG_BIT1		= (FLAG_BIT0 << 1),
 			FLAG_BIT2		= (FLAG_BIT1 << 1),
 			FLAG_BIT3		= (FLAG_BIT2 << 1),
-			FLAG_ZERO		= (FLAG_BIT3 << 0),
-			FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
-			FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
-			FLAG_CARRY		= (FLAG_HALF_CARRY << 1)
 		};
 
-		reg_t		regs;
-		flags_t		regFlags; // TODO: defines/function members for fast modify flags
+		typedef void (const *exeOpcode_t)(const cpu_t& core);
 
-		typedef Memory mem_t;
-
-		mem_t	memory;
-
-		// TODO: Array of mapped instructions indexing function pointers
+		// TODO: Array of mapped instructions indexing function pointers type exeOpcode_t
 
 		public:
 
-		CPU(mem_t memory_type) : memory(memory_type), regFlags()
+		CPUZ80(const mem_t& memory_type)
+		: CPU(memory_type, Z80Registers(0/*TODO*/), (flags_t)0)
 		{
 			/* ... */
 		}
