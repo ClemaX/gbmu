@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+# include <emulation/CPU.hpp>
+
 int	main()
 {
 	emulation::PagedMemory<std::uint8_t, std::uintptr_t, 8>		paged;
@@ -20,6 +22,8 @@ int	main()
 	std::cout << "Reading from bank 1: " << (int)paged.read(8) << std::endl;
 	banked.switchTo(0);
 	std::cout << "Reading from bank 0: " << (int)paged.read(8) << std::endl;
+
+	gbmu::CPUZ80<long> compile_test(0L);
 
 	return 0;
 }

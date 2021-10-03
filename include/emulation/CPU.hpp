@@ -56,6 +56,7 @@ namespace GBMU_NAMESPACE {
 		opcode_byte_t	getQ() const { return this->unprefixedValue & PREFIX_QMASK; }
 		int8_t			getPrefixFamily() const { return this->prefixFamily; }
 
+		// TODO: Wait a minute ... This return true in all the cases !!!
 		bool			isValid()
 		{
 			return (
@@ -188,11 +189,11 @@ namespace GBMU_NAMESPACE {
 		{ }
 
 		CPU(const CPU& other)
-		: memory(other.mem), regs(other.regs), flags(other.flagsCt)
+		: memory(other.mem), regs(other.regs), flags(other.flags)
 		{ }
 
 		CPU(const CPU&& other)
-		: memory(other.mem), regs(other.regs), flags(other.flagsCt)
+		: memory(other.mem), regs(other.regs), flags(other.flags)
 		{ }
 
 		CPU&
@@ -282,8 +283,449 @@ namespace GBMU_NAMESPACE {
 		// Operations function pointers //
 		//////////////////////////////////
 
+		template <typename T>
+		__attribute__ ((always_inline))
+		static inline void
+		operBaseLD(T& dest, T src)
+		noexcept
+		{ dest = src; }
+
+		template <typename T>
+		__attribute__ ((always_inline))
+		static inline void
+		operBaseInc(T& target)
+		noexcept
+		{ ++target; }
+
+		template <typename T>
+		__attribute__ ((always_inline))
+		static inline void
+		operBaseDec(T& target)
+		noexcept
+		{ --target; }
+
+
+
+
+
+		/// Opcode 0x0 + all ignored instructions
 		static void OperNop(const CPU<Memory, Z80Registers, uint8_t>& core)
 		{ static_cast<void>(core); }
+
+
+//
+///TODO: No y, find the exact spot to place them with opcode value
+//
+		/// Opcode ? ( LD (BC), A )
+		static void operLD_AinPAddrBC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(/* memory at this addr */core.regs.bc, static_cast<udword_t>(core.regs.afwords.a)); }
+
+		/// Opcode ? ( LD (DE), A )
+		static void operLD_AinPAddrDE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(/* memory at this addr */core.regs.de, static_cast<udword_t>(core.regs.afwords.a)); }
+
+		/// Opcode ? ( LD A, (BC) )
+		static void operLD_PAdrrBCinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{
+			// overflow flag if BC > MAX_U8 ?
+			operBaseLD(core.regs.afwords.a, /* value at the memory at this addr */core.regs.bc);
+		}
+
+		/// Opcode ? ( LD A, (DE) )
+		static void operLD_PAdrrDEinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{
+			// overflow flag if DE > MAX_U8 ?
+			operBaseLD(core.regs.afwords.a, /* value at the memory at this addr */core.regs.de);
+		}
+
+		/// Opcode: ? ( LD (nn), HL )
+
+		/// Opcode: ? ( LD (nn), A )
+
+		/// Opcode: ?, ( LD HL, (nn) )
+
+		/// Opcode: ? ( LD A, (nn) )
+
+
+
+//
+///TODO: No y, find the exact spot to place them with opcode value
+//
+		/// Opcode: ? ( INC BC )
+		static void operIncBC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.bc); }
+
+		/// Opcode: ? ( INC DE )
+		static void operIncDE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.de); }
+
+		/// Opcode: ? ( INC HL )
+		static void operIncHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.hl); }
+
+		/// Opcode: ? ( INC AF )
+		static void operIncAF(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.af); }
+
+		/// Opcode: ? ( DEC BC )
+		static void operDecBC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.bc); }
+
+		/// Opcode: ? ( DEC DE )
+		static void operDecDE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.de); }
+
+		/// Opcode: ? ( DEC HL )
+		static void operDecHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.hl); }
+
+		/// Opcode: ? ( DEC AF )
+		static void operDecAF(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.af); }
+
+
+
+
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
+		/// Opcode: ? ( INC B )
+		static void operIncB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.bcwords.b); }
+
+		/// Opcode: ? ( INC C )
+		static void operIncC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.bcwords.c); }
+
+		/// Opcode: ? ( INC D )
+		static void operIncD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.dewords.d); }
+
+		/// Opcode: ? ( INC E )
+		static void operIncE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.dewords.e); }
+
+		/// Opcode: ? ( INC H )
+		static void operIncH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.hlwords.h); }
+
+		/// Opcode: ? ( INC L )
+		static void operIncL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.hlwords.l); }
+
+		/// Opcode: ? ( INC (HL) )
+		static void operIncPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.hl /* What is pointed by hl */); }
+
+		/// Opcode: ? ( INC A )
+		static void operIncA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseInc(core.regs.afwords.a); }
+
+		/// Opcode: ? ( DEC B )
+		static void operDecB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.bcwords.b); }
+
+		/// Opcode: ? ( DEC C )
+		static void operDecC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.bcwords.c); }
+
+		/// Opcode: ? ( DEC D )
+		static void operDecD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.dewords.d); }
+
+		/// Opcode: ? ( DEC E )
+		static void operDecE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.dewords.e); }
+
+		/// Opcode: ? ( DEC H )
+		static void operDecH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.hlwords.h); }
+
+		/// Opcode: ? ( DEC L )
+		static void operDecL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.hlwords.l); }
+
+		/// Opcode: ? ( DEC (HL) )
+		static void operDecPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.hl /* What is pointed by hl */); }
+
+		/// Opcode: ? ( DEC A )
+		static void operDecA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseDec(core.regs.afwords.a); }
+
+
+
+
+
+
+		/// Opcode: ? ( RLCA )
+		/// Opcode: ? ( RRCA )
+		/// Opcode: ? ( RLA )
+		/// Opcode: ? ( RRA )
+		/// Opcode: ? ( DAA )
+		/// Opcode: ? ( CPL )
+		/// Opcode: ? ( SCF )
+		/// Opcode: ? ( CCF )
+
+
+		/// Opcode: ? ( LD B, B )
+		static void operLD_BinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD C, B )
+		static void operLD_BinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.c, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD D, B )
+		static void operLD_BinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD E, B )
+		static void operLD_BinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD H, B )
+		static void operLD_BinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD L, B )
+		static void operLD_BinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD (HL), B )
+		static void operLD_BinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.b)); }
+
+		/// Opcode: ? ( LD A, B )
+		static void operLD_BinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.bcwords.b); }
+
+		/// Opcode: ? ( LD B, C )
+		static void operLD_CinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD C, C )
+		static void operLD_CinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD D, C )
+		static void operLD_CinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD E, C )
+		static void operLD_CinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD H, C )
+		static void operLD_CinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD L, C )
+		static void operLD_CinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD (HL), C )
+		static void operLD_CinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.c)); }
+
+		/// Opcode: ? ( LD A, C )
+		static void operLD_CinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.bcwords.c); }
+
+		/// Opcode: ? ( LD B, D )
+		static void operLD_DinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD C, D )
+		static void operLD_DinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD D, D )
+		static void operLD_DinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD E, D )
+		static void operLD_DinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD H, D )
+		static void operLD_DinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD L, D )
+		static void operLD_DinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD (HL), D )
+		static void operLD_DinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.d)); }
+
+		/// Opcode: ? ( LD A, D )
+		static void operLD_DinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.dewords.d); }
+
+		/// Opcode: ? ( LD B, E )
+		static void operLD_EinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD C, E )
+		static void operLD_EinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD D, E )
+		static void operLD_EinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD E, E )
+		static void operLD_EinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD H, E )
+		static void operLD_EinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD L, E )
+		static void operLD_EinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD (HL), E )
+		static void operLD_EinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.e)); }
+
+		/// Opcode: ? ( LD A, E )
+		static void operLD_EinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.dewords.e); }
+
+		/// Opcode: ? ( LD B, H )
+		static void operLD_HinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD C, H )
+		static void operLD_HinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD D, H )
+		static void operLD_HinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD E, H )
+		static void operLD_HinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD H, H )
+		static void operLD_HinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD L, H )
+		static void operLD_HinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD (HL), H )
+		static void operLD_HinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.h)); }
+
+		/// Opcode: ? ( LD A, H )
+		static void operLD_HinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.hlwords.h); }
+
+		/// Opcode: ? ( LD B, L )
+		static void operLD_LinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD C, L )
+		static void operLD_LinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD D, L )
+		static void operLD_LinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD E, L )
+		static void operLD_LinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD H, L )
+		static void operLD_LinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD L, L )
+		static void operLD_LinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core);}
+
+		/// Opcode: ? ( LD (HL), L )
+		static void operLD_LinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.l)); }
+
+		/// Opcode: ? ( LD A, L )
+		static void operLD_LinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, core.regs.hlwords.l); }
+
+		/// Opcode: ? ( LD B, (HL) )
+		static void operLD_PAddrHLinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */)); }
+
+		/// Opcode: ? ( LD C, (HL) )
+		static void operLD_PAddrHLinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */)); }
+
+		/// Opcode: ? ( LD D, (HL) )
+		static void operLD_PAddrHLinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, static_cast<udword_t>(core.regs.hl /* The value poited by */)); }
+
+		/// Opcode: ? ( LD E, (HL) )
+		static void operLD_PAddrHLinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, static_cast<udword_t>(core.regs.hl /* The value poited by */)); }
+
+		/// Opcode: ? ( LD H, (HL) )
+		static void operLD_PAddrHLinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, static_cast<udword_t>(core.regs.hl/* The value poited by */)); }
+
+		/// Opcode: ? ( LD L, (HL) )
+		static void operLD_PAddrHLinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, static_cast<udword_t>(core.regs.hl/* The value poited by */)); }
+
+		/// Opcode: ? ( LD (HL), (HL) )
+		static void operLD_PAddrHLinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+		/// Opcode: ? ( LD A, (HL) )
+		static void operLD_PAddrHLinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.afwords.a, static_cast<udword_t>(core.regs.hl /* The value poited by */)); }
+
+		/// Opcode: ? ( LD B, A )
+		static void operLD_AinB(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD C, A )
+		static void operLD_AinC(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.bcwords.b, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD D, A )
+		static void operLD_AinD(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.d, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD E, A )
+		static void operLD_AinE(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.dewords.e, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD H, A )
+		static void operLD_AinH(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.h, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD L, A )
+		static void operLD_AinL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hlwords.l, core.regs.afwords.a); }
+
+		/// Opcode: ? ( LD (HL), A )
+		static void operLD_AinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ operBaseLD(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.afwords.a)); }
+
+		/// Opcode: ? ( LD A, A )
+		static void operLD_AinA(const CPU<Memory, Z80Registers, uint8_t>& core)
+		{ static_cast<void>(core); }
+
+
+
 
 		///////////////////////////////////////////////////////
 		// All operations are indexed & statically preloaded //
@@ -711,9 +1153,9 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinPAddrBC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinPAddrDE,
 								/* P = 2 */
 								&OperNop,
 								/* P = 3 */
@@ -722,9 +1164,9 @@ namespace GBMU_NAMESPACE {
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinPAddrDE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAdrrDEinA,
 								/* P = 2 */
 								&OperNop,
 								/* P = 3 */
@@ -914,24 +1356,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncBC,
 								/* P = 1 */
-								&OperNop,
+								&operIncDE,
 								/* P = 2 */
-								&OperNop,
+								&operIncHL,
 								/* P = 3 */
-								&OperNop
+								&operIncAF
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecBC,
 								/* P = 1 */
-								&OperNop,
+								&operDecDE,
 								/* P = 2 */
-								&OperNop,
+								&operDecHL,
 								/* P = 3 */
-								&OperNop
+								&operDecAF
 							}
 						},
 						/* Y = 1 */
@@ -1117,24 +1559,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncB,
 								/* P = 1 */
-								&OperNop,
+								&operIncB,
 								/* P = 2 */
-								&OperNop,
+								&operIncB,
 								/* P = 3 */
-								&OperNop
+								&operIncB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncB,
 								/* P = 1 */
-								&OperNop,
+								&operIncB,
 								/* P = 2 */
-								&OperNop,
+								&operIncB,
 								/* P = 3 */
-								&OperNop
+								&operIncB
 							}
 						},
 						/* Y = 1 */
@@ -1142,24 +1584,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncC,
 								/* P = 1 */
-								&OperNop,
+								&operIncC,
 								/* P = 2 */
-								&OperNop,
+								&operIncC,
 								/* P = 3 */
-								&OperNop
+								&operIncC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncC,
 								/* P = 1 */
-								&OperNop,
+								&operIncC,
 								/* P = 2 */
-								&OperNop,
+								&operIncC,
 								/* P = 3 */
-								&OperNop
+								&operIncC
 							}
 						},
 						/* Y = 2 */
@@ -1167,24 +1609,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncD,
 								/* P = 1 */
-								&OperNop,
+								&operIncD,
 								/* P = 2 */
-								&OperNop,
+								&operIncD,
 								/* P = 3 */
-								&OperNop
+								&operIncD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncD,
 								/* P = 1 */
-								&OperNop,
+								&operIncD,
 								/* P = 2 */
-								&OperNop,
+								&operIncD,
 								/* P = 3 */
-								&OperNop
+								&operIncD
 							}
 						},
 						/* Y = 3 */
@@ -1192,24 +1634,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncE,
 								/* P = 1 */
-								&OperNop,
+								&operIncE,
 								/* P = 2 */
-								&OperNop,
+								&operIncE,
 								/* P = 3 */
-								&OperNop
+								&operIncE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncE,
 								/* P = 1 */
-								&OperNop,
+								&operIncE,
 								/* P = 2 */
-								&OperNop,
+								&operIncE,
 								/* P = 3 */
-								&OperNop
+								&operIncE
 							}
 						},
 						/* Y = 4 */
@@ -1217,24 +1659,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncH,
 								/* P = 1 */
-								&OperNop,
+								&operIncH,
 								/* P = 2 */
-								&OperNop,
+								&operIncH,
 								/* P = 3 */
-								&OperNop
+								&operIncH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncH,
 								/* P = 1 */
-								&OperNop,
+								&operIncH,
 								/* P = 2 */
-								&OperNop,
+								&operIncH,
 								/* P = 3 */
-								&OperNop
+								&operIncH
 							}
 						},
 						/* Y = 5 */
@@ -1242,24 +1684,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncL,
 								/* P = 1 */
-								&OperNop,
+								&operIncL,
 								/* P = 2 */
-								&OperNop,
+								&operIncL,
 								/* P = 3 */
-								&OperNop
+								&operIncL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncL,
 								/* P = 1 */
-								&OperNop,
+								&operIncL,
 								/* P = 2 */
-								&OperNop,
+								&operIncL,
 								/* P = 3 */
-								&OperNop
+								&operIncL
 							}
 						},
 						/* Y = 6 */
@@ -1267,24 +1709,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operIncPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operIncPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operIncPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -1292,24 +1734,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncA,
 								/* P = 1 */
-								&OperNop,
+								&operIncA,
 								/* P = 2 */
-								&OperNop,
+								&operIncA,
 								/* P = 3 */
-								&OperNop
+								&operIncA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operIncA,
 								/* P = 1 */
-								&OperNop,
+								&operIncA,
 								/* P = 2 */
-								&OperNop,
+								&operIncA,
 								/* P = 3 */
-								&OperNop
+								&operIncA
 							}
 						}
 					},
@@ -1320,24 +1762,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecB,
 								/* P = 1 */
-								&OperNop,
+								&operDecB,
 								/* P = 2 */
-								&OperNop,
+								&operDecB,
 								/* P = 3 */
-								&OperNop
+								&operDecB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecB,
 								/* P = 1 */
-								&OperNop,
+								&operDecB,
 								/* P = 2 */
-								&OperNop,
+								&operDecB,
 								/* P = 3 */
-								&OperNop
+								&operDecB
 							}
 						},
 						/* Y = 1 */
@@ -1345,24 +1787,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecC,
 								/* P = 1 */
-								&OperNop,
+								&operDecC,
 								/* P = 2 */
-								&OperNop,
+								&operDecC,
 								/* P = 3 */
-								&OperNop
+								&operDecC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecC,
 								/* P = 1 */
-								&OperNop,
+								&operDecC,
 								/* P = 2 */
-								&OperNop,
+								&operDecC,
 								/* P = 3 */
-								&OperNop
+								&operDecC
 							}
 						},
 						/* Y = 2 */
@@ -1370,24 +1812,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecD,
 								/* P = 1 */
-								&OperNop,
+								&operDecD,
 								/* P = 2 */
-								&OperNop,
+								&operDecD,
 								/* P = 3 */
-								&OperNop
+								&operDecD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecD,
 								/* P = 1 */
-								&OperNop,
+								&operDecD,
 								/* P = 2 */
-								&OperNop,
+								&operDecD,
 								/* P = 3 */
-								&OperNop
+								&operDecD
 							}
 						},
 						/* Y = 3 */
@@ -1395,24 +1837,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecE,
 								/* P = 1 */
-								&OperNop,
+								&operDecE,
 								/* P = 2 */
-								&OperNop,
+								&operDecE,
 								/* P = 3 */
-								&OperNop
+								&operDecE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecE,
 								/* P = 1 */
-								&OperNop,
+								&operDecE,
 								/* P = 2 */
-								&OperNop,
+								&operDecE,
 								/* P = 3 */
-								&OperNop
+								&operDecE
 							}
 						},
 						/* Y = 4 */
@@ -1420,24 +1862,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecH,
 								/* P = 1 */
-								&OperNop,
+								&operDecH,
 								/* P = 2 */
-								&OperNop,
+								&operDecH,
 								/* P = 3 */
-								&OperNop
+								&operDecH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecH,
 								/* P = 1 */
-								&OperNop,
+								&operDecH,
 								/* P = 2 */
-								&OperNop,
+								&operDecH,
 								/* P = 3 */
-								&OperNop
+								&operDecH
 							}
 						},
 						/* Y = 5 */
@@ -1445,24 +1887,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecL,
 								/* P = 1 */
-								&OperNop,
+								&operDecL,
 								/* P = 2 */
-								&OperNop,
+								&operDecL,
 								/* P = 3 */
-								&OperNop
+								&operDecL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecL,
 								/* P = 1 */
-								&OperNop,
+								&operDecL,
 								/* P = 2 */
-								&OperNop,
+								&operDecL,
 								/* P = 3 */
-								&OperNop
+								&operDecL
 							}
 						},
 						/* Y = 6 */
@@ -1470,24 +1912,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operDecPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operDecPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operDecPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -1495,24 +1937,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecA,
 								/* P = 1 */
-								&OperNop,
+								&operDecA,
 								/* P = 2 */
-								&OperNop,
+								&operDecA,
 								/* P = 3 */
-								&OperNop
+								&operDecA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operDecA,
 								/* P = 1 */
-								&OperNop,
+								&operDecA,
 								/* P = 2 */
-								&OperNop,
+								&operDecA,
 								/* P = 3 */
-								&OperNop
+								&operDecA
 							}
 						}
 					},
@@ -1932,24 +2374,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinB
 							}
 						},
 						/* Y = 1 */
@@ -1957,24 +2399,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinC
 							}
 						},
 						/* Y = 2 */
@@ -1982,24 +2424,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinD
 							}
 						},
 						/* Y = 3 */
@@ -2007,24 +2449,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinE
 							}
 						},
 						/* Y = 4 */
@@ -2032,24 +2474,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinH
 							}
 						},
 						/* Y = 5 */
@@ -2057,24 +2499,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinL
 							}
 						},
 						/* Y = 6 */
@@ -2082,24 +2524,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -2107,24 +2549,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_BinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_BinA
 							}
 						}
 					},
@@ -2135,24 +2577,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinB
 							}
 						},
 						/* Y = 1 */
@@ -2160,24 +2602,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinC
 							}
 						},
 						/* Y = 2 */
@@ -2185,24 +2627,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinD
 							}
 						},
 						/* Y = 3 */
@@ -2210,24 +2652,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinE
 							}
 						},
 						/* Y = 4 */
@@ -2235,24 +2677,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinH
 							}
 						},
 						/* Y = 5 */
@@ -2260,24 +2702,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinL
 							}
 						},
 						/* Y = 6 */
@@ -2285,24 +2727,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -2310,24 +2752,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_CinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_CinA
 							}
 						}
 					},
@@ -2338,24 +2780,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinB
 							}
 						},
 						/* Y = 1 */
@@ -2363,24 +2805,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinC
 							}
 						},
 						/* Y = 2 */
@@ -2388,24 +2830,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinD
 							}
 						},
 						/* Y = 3 */
@@ -2413,24 +2855,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinE
 							}
 						},
 						/* Y = 4 */
@@ -2438,24 +2880,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinH
 							}
 						},
 						/* Y = 5 */
@@ -2463,24 +2905,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinL
 							}
 						},
 						/* Y = 6 */
@@ -2488,24 +2930,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -2513,24 +2955,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_DinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_DinA
 							}
 						}
 					},
@@ -2541,24 +2983,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinB
 							}
 						},
 						/* Y = 1 */
@@ -2566,24 +3008,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinC
 							}
 						},
 						/* Y = 2 */
@@ -2591,24 +3033,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinD
 							}
 						},
 						/* Y = 3 */
@@ -2616,24 +3058,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinE
 							}
 						},
 						/* Y = 4 */
@@ -2641,24 +3083,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinH
 							}
 						},
 						/* Y = 5 */
@@ -2666,24 +3108,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinL
 							}
 						},
 						/* Y = 6 */
@@ -2691,24 +3133,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -2716,24 +3158,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_EinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_EinA
 							}
 						}
 					},
@@ -2744,24 +3186,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinB
 							}
 						},
 						/* Y = 1 */
@@ -2769,24 +3211,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinC
 							}
 						},
 						/* Y = 2 */
@@ -2794,24 +3236,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinD
 							}
 						},
 						/* Y = 3 */
@@ -2819,24 +3261,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinE
 							}
 						},
 						/* Y = 4 */
@@ -2844,24 +3286,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinH
 							}
 						},
 						/* Y = 5 */
@@ -2869,24 +3311,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinL
 							}
 						},
 						/* Y = 6 */
@@ -2894,24 +3336,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -2919,24 +3361,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_HinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_HinA
 							}
 						}
 					},
@@ -2947,24 +3389,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinB
 							}
 						},
 						/* Y = 1 */
@@ -2972,24 +3414,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinC
 							}
 						},
 						/* Y = 2 */
@@ -2997,24 +3439,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinD
 							}
 						},
 						/* Y = 3 */
@@ -3022,24 +3464,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinE
 							}
 						},
 						/* Y = 4 */
@@ -3047,24 +3489,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinH
 							}
 						},
 						/* Y = 5 */
@@ -3072,24 +3514,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinL
 							}
 						},
 						/* Y = 6 */
@@ -3097,24 +3539,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -3122,24 +3564,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_LinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_LinA
 							}
 						}
 					},
@@ -3150,24 +3592,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinB
 							}
 						},
 						/* Y = 1 */
@@ -3175,24 +3617,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinC
 							}
 						},
 						/* Y = 2 */
@@ -3200,24 +3642,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinD
 							}
 						},
 						/* Y = 3 */
@@ -3225,24 +3667,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinE
 							}
 						},
 						/* Y = 4 */
@@ -3250,24 +3692,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinH
 							}
 						},
 						/* Y = 5 */
@@ -3275,24 +3717,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinL
 							}
 						},
 						/* Y = 6 */
@@ -3300,24 +3742,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -3325,24 +3767,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_PAddrHLinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_PAddrHLinA
 							}
 						}
 					},
@@ -3353,24 +3795,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinB,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinB
 							}
 						},
 						/* Y = 1 */
@@ -3378,24 +3820,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinC,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinC
 							}
 						},
 						/* Y = 2 */
@@ -3403,24 +3845,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinD,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinD
 							}
 						},
 						/* Y = 3 */
@@ -3428,24 +3870,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinE,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinE
 							}
 						},
 						/* Y = 4 */
@@ -3453,24 +3895,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinH,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinH
 							}
 						},
 						/* Y = 5 */
@@ -3478,24 +3920,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinL,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinL
 							}
 						},
 						/* Y = 6 */
@@ -3503,24 +3945,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -3528,24 +3970,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 1 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 2 */
-								&OperNop,
+								&operLD_AinA,
 								/* P = 3 */
-								&OperNop
+								&operLD_AinA
 							}
 						}
 					}
@@ -40774,7 +41216,7 @@ namespace GBMU_NAMESPACE {
 				{
 					/* Z = 0 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -40977,7 +41419,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 1 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -41180,7 +41622,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 2 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -41383,7 +41825,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 3 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -41586,7 +42028,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 4 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -41789,7 +42231,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 5 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -41992,7 +42434,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 6 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -42195,7 +42637,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 7 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -42401,7 +42843,7 @@ namespace GBMU_NAMESPACE {
 				{
 					/* Z = 0 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -42604,7 +43046,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 1 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -43010,7 +43452,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 3 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -43213,7 +43655,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 4 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -43416,7 +43858,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 5 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -43619,7 +44061,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 6 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -43822,7 +44264,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 7 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -44028,7 +44470,7 @@ namespace GBMU_NAMESPACE {
 				{
 					/* Z = 0 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -44231,7 +44673,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 1 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -44637,7 +45079,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 3 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -44840,7 +45282,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 4 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -45043,7 +45485,7 @@ namespace GBMU_NAMESPACE {
 					},
 					/* Z = 5 */
 					{
-												/* Y = 0 */
+						/* Y = 0 */
 						{
 							/* Q = 0 */
 							{
@@ -45660,6 +46102,7 @@ namespace GBMU_NAMESPACE {
 		void executeOperation(Opcode opcode)
 		// may throw ExceptionInvalidOpcode
 		{
+			// TODO: isValid seems to always return true ...
 			if (opcode.isValid())
 			{
 				this->operations[this->getPrefixIndex(opcode.getPrefixFamily())]
@@ -45675,7 +46118,7 @@ namespace GBMU_NAMESPACE {
 		public:
 
 		CPUZ80(const mem_t& memory_type)
-		: CPU<mem_t, reg_t, flags_t>(memory_type, Z80Registers(0/*TODO*/), (flags_t)0)
+		: CPU<mem_t, reg_t, flags_t>(memory_type, Z80Registers(0XFFFE, 0x100), (flags_t)0)
 		{
 			/* ... */
 		}
