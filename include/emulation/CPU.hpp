@@ -84,7 +84,7 @@ namespace GBMU_NAMESPACE {
 		: prefixedValue(opcode),
 		unprefixedValue(static_cast<opcode_byte_t>(opcode))
 		{
-			// TODO: Check if i shift the right amount
+			/// TODO: Check if i shift the right amount
 			switch (static_cast<uint16_t>(opcode >> 16))
 			{
 				case 0XCB:
@@ -173,6 +173,9 @@ namespace GBMU_NAMESPACE {
 
 		Z80Registers(ptrdiff_t stackstart, ptrdiff_t entrypoint = 0X100)
 		: af(0), bc(0), de(0), hl(0), sp(stackstart), pc(entrypoint)
+		{ }
+
+		~Z80Registers()
 		{ }
 	};
 
@@ -340,10 +343,6 @@ namespace GBMU_NAMESPACE {
 			}
 		}
 
-		//////////////////////////////////
-		// Operations function pointers //
-		//////////////////////////////////
-
 		template <typename T, int64_t cycles>
 		__attribute__ ((always_inline))
 		static inline void
@@ -360,27 +359,7 @@ namespace GBMU_NAMESPACE {
 		operBaseInc(T& target, Chrono& c)
 		noexcept
 		{
-			/** NOTE: Flags affected:
-				Z - Set if result is zero.
-  				N - Reset.
-  				H - Set if carry from bit 3.
-  				C - Not affected.
-			*/
-
-			// typedef typename CPUZ80::flags::FLAG_ZERO		FLAG_ZERO;
-			// typedef typename CPUZ80::flags::FLAG_SUBSTRACT	FLAG_SUBSTRACT;
-			// typedef typename CPUZ80::flags::FLAG_HALF_CARRY	FLAG_HALF_CARRY;
-			// typedef typename CPUZ80::flags::FLAG_CARRY		FLAG_CARRY;
-
-			/* if (*/++target;// == 0)
-			// 	FGMASK_ADD(flags, FLAG_ZERO);
-			// FGMASK_DEL(flags, FLAG_SUBSTRACT);
-			// /// TODO:
-			// if (FGMASK_HAS(flags, FLAG_CARRY))
-			// {
-			// 	// H - Set if carry from bit 3.
-			// }
-
+			++target;
 			c.setCycles(cycles);
 		}
 
@@ -390,31 +369,9 @@ namespace GBMU_NAMESPACE {
 		operBaseDec(T& target, Chrono& c)
 		noexcept
 		{
-			/** NOTE: Flags affected:
-				Z - Set if result is zero.
-  				N - Reset.
-  				H - Set if carry from bit 4.
-  				C - Not affected.
-			*/
-
-			// typedef typename CPUZ80::flags::FLAG_ZERO		FLAG_ZERO;
-			// typedef typename CPUZ80::flags::FLAG_SUBSTRACT	FLAG_SUBSTRACT;
-			// typedef typename CPUZ80::flags::FLAG_HALF_CARRY	FLAG_HALF_CARRY;
-			// typedef typename CPUZ80::flags::FLAG_CARRY		FLAG_CARRY;
-
-			/* if (*/--target;// == 0)
-			// 	FGMASK_ADD(flags, FLAG_ZERO);
-			// FGMASK_DEL(flags, FLAG_SUBSTRACT);
-			// /// TODO:
-			// if (FGMASK_HAS(flags, FLAG_CARRY))
-			// {
-			// 	// H - Set if carry from bit 4.
-			// }
+			--target;
 			c.setCycles(cycles);
 		}
-
-		///TODO: A fucntion to handle falgs for INC & DEC
-		///TODO: A Chrono class that mesures time between frames
 
 		template <int64_t cycles = 4>
 		static inline void
@@ -424,6 +381,94 @@ namespace GBMU_NAMESPACE {
 			static_cast<void>(core);
 			c.setCycles(cycles);
 		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseAdd(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			dest += src;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseAddCarry(T& dest, T src, Chrono& c, Flags flags)
+		noexcept
+		{
+			operBaseAdd(dest, src, c);
+			///TODO: Add carry flag
+			static_cast<void>(flags);
+		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseSub(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			dest -= src;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseSubCarry(T& dest, T src, Chrono& c, Flags flags)
+		noexcept
+		{
+			operBaseSub(dest, src, c);
+			///TODO: Add carry flag
+			static_cast<void>(flags);
+		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseAnd(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			dest &= src;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseXor(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			dest ^= src;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseOr(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			dest |= src;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, int64_t cycles = 4>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseCp(T& dest, T src, Chrono& c)
+		noexcept
+		{
+			static_cast<void>(dest);
+			static_cast<void>(src);
+			///TODO:
+			c.setCycles(cycles);
+		}
+
+		//////////////////////////////////
+		// Operations function pointers //
+		//////////////////////////////////
 
 		/// Opcode 0x0 + all ignored instructions
 		static void OperNop(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
@@ -663,10 +708,10 @@ namespace GBMU_NAMESPACE {
 
 
 
-		/// Opcode: ? ( RLCA )
-		/// Opcode: ? ( RRCA )
-		/// Opcode: ? ( RLA )
-		/// Opcode: ? ( RRA )
+		/// Opcode: 0X07, cycles: 4 ( RLCA )
+		/// Opcode: 0X0F, cycles: 4 ( RRCA )
+		/// Opcode: 0X17, cycles: 4 ( RLA )
+		/// Opcode: 0X1F, cycles: 4 ( RRA )
 		/// Opcode: ? ( DAA )
 		/// Opcode: ? ( CPL )
 		/// Opcode: ? ( SCF )
@@ -996,8 +1041,73 @@ namespace GBMU_NAMESPACE {
 		operLD_AinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ OperNop(core, c); }
 
+		///TODO: Implement those using 'already done' base inlined functions
+		///TODO: Do not forget to handle flags !
 
-
+		/// Opcode: 0X80, cycles: 4 ( ADD A, B )
+		/// Opcode: 0X88, cycles: 4 ( ADC A, B )
+		/// Opcode: 0X90, cycles: 4 ( SUB B )
+		/// Opcode: 0X98, cycles: 4 ( SBC A, B )
+		/// Opcode: 0XA0, cycles: 4 ( AND B )
+		/// Opcode: 0XA8, cycles: 4 ( XOR B )
+		/// Opcode: 0XB0, cycles: 4 ( OR B )
+		/// Opcode: 0XB8, cycles: 4 ( CP B )
+		/// Opcode: 0X81, cycles: 4 ( ADD A, C )
+		/// Opcode: 0X89, cycles: 4 ( ADC A, C )
+		/// Opcode: 0X91, cycles: 4 ( SUB C )
+		/// Opcode: 0X99, cycles: 4 ( SBC A, C )
+		/// Opcode: 0XA1, cycles: 4 ( AND C )
+		/// Opcode: 0XA9, cycles: 4 ( XOR C )
+		/// Opcode: 0XB1, cycles: 4 ( OR C )
+		/// Opcode: 0XB9, cycles: 4 ( CP C )
+		/// Opcode: 0X82, cycles: 4 ( ADD A, D )
+		/// Opcode: 0X8A, cycles: 4 ( ADC A, D )
+		/// Opcode: 0X92, cycles: 4 ( SUB D )
+		/// Opcode: 0X9A, cycles: 4 ( SBC A, D )
+		/// Opcode: 0XA2, cycles: 4 ( AND D )
+		/// Opcode: 0XAA, cycles: 4 ( XOR D )
+		/// Opcode: 0XB2, cycles: 4 ( OR D )
+		/// Opcode: 0XBA, cycles: 4 ( CP D )
+		/// Opcode: 0X83, cycles: 4 ( ADD A, E )
+		/// Opcode: 0X8B, cycles: 4 ( ADC A, E )
+		/// Opcode: 0X93, cycles: 4 ( SUB E )
+		/// Opcode: 0X9B, cycles: 4 ( SBC A, E )
+		/// Opcode: 0XA3, cycles: 4 ( AND E )
+		/// Opcode: 0XAB, cycles: 4 ( XOR E )
+		/// Opcode: 0XB3, cycles: 4 ( OR E )
+		/// Opcode: 0XBB, cycles: 4 ( CP E )
+		/// Opcode: 0X84, cycles: 4 ( ADD A, H )
+		/// Opcode: 0X8C, cycles: 4 ( ADC A, H )
+		/// Opcode: 0X94, cycles: 4 ( SUB H )
+		/// Opcode: 0X9C, cycles: 4 ( SBC A, H )
+		/// Opcode: 0XA4, cycles: 4 ( AND H )
+		/// Opcode: 0XAC, cycles: 4 ( XOR H )
+		/// Opcode: 0XB4, cycles: 4 ( OR H )
+		/// Opcode: 0XBC, cycles: 4 ( CP H )
+		/// Opcode: 0X85, cycles: 4 ( ADD A, L )
+		/// Opcode: 0X8D, cycles: 4 ( ADC A, L )
+		/// Opcode: 0X95, cycles: 4 ( SUB L )
+		/// Opcode: 0X9D, cycles: 4 ( SBC A, L )
+		/// Opcode: 0XA5, cycles: 4 ( AND L )
+		/// Opcode: 0XAD, cycles: 4 ( XOR L )
+		/// Opcode: 0XB5, cycles: 4 ( OR L )
+		/// Opcode: 0XBD, cycles: 4 ( CP L )
+		/// Opcode: 0X86, cycles: 4 ( ADD A, (HL) )
+		/// Opcode: 0X8E, cycles: 4 ( ADC A, (HL) )
+		/// Opcode: 0X96, cycles: 4 ( SUB (HL) )
+		/// Opcode: 0X9E, cycles: 8 ( SBC A, (HL) )
+		/// Opcode: 0XA6, cycles: 8( AND (HL) )
+		/// Opcode: 0XAE, cycles: 8 ( XOR (HL) )
+		/// Opcode: 0XB6, cycles: 8 ( OR (HL) )
+		/// Opcode: 0XBE, cycles: 8 ( CP (HL) )
+		/// Opcode: 0X87, cycles: 4 ( ADD A, A )
+		/// Opcode: 0X8F, cycles: 4 ( ADC A, A )
+		/// Opcode: 0X97, cycles: 4 ( SUB A )
+		/// Opcode: 0X9F, cycles: 4 ( SBC A, A )
+		/// Opcode: 0XA7, cycles: 4 ( AND A )
+		/// Opcode: 0XAF, cycles: 4 ( XOR A )
+		/// Opcode: 0XB7, cycles: 4 ( OR A )
+		/// Opcode: 0XBF, cycles: 4 ( CP A )
 
 		///////////////////////////////////////////////////////
 		// All operations are indexed & statically preloaded //
@@ -46396,5 +46506,8 @@ namespace GBMU_NAMESPACE {
 		{
 			/* ... */
 		}
+
+		~CPUZ80()
+		{ }
     };
 }
