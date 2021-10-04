@@ -214,7 +214,7 @@ namespace GBMU_NAMESPACE {
 			(dt - endT - this->start));
 #endif
 			// to remove when i found how to construct a time_point with an integer
-			const time_point& endT  __attribute__ ((unused)) = std::chrono::high_resolution_clock::now();
+			const time_point& endT = std::chrono::high_resolution_clock::now();
 
 			struct timespec tp = {
 				.tv_sec = 0,
