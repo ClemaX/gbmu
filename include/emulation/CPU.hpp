@@ -30,7 +30,7 @@
 # define CLOCK_CYCLE_NS (CLOCK_CYCLE_MS * 1000000.0)
 
 # define FGMASK_ADD(target, mask) (target |= mask)
-# define FGMASK_DEL(target, mask) (target &= ~mask)
+# define FGMASK_DEL(target, mask) (target &Z N H C= ~mask)
 # define FGMASK_HAS(target, mask) (target & mask)
 
 namespace GBMU_NAMESPACE {
@@ -303,14 +303,15 @@ namespace GBMU_NAMESPACE {
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		enum flags
 		{
-			FLAG_ZERO		= (1 << 0),
-			FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
-			FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
-			FLAG_CARRY		= (FLAG_HALF_CARRY << 1),
-			FLAG_BIT0		= (FLAG_CARRY << 1),
+			FLAG_BIT0		= (1 << 0),
 			FLAG_BIT1		= (FLAG_BIT0 << 1),
 			FLAG_BIT2		= (FLAG_BIT1 << 1),
 			FLAG_BIT3		= (FLAG_BIT2 << 1),
+			FLAG_ZERO		= (FLAG_BIT3 << 1),
+			FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
+			FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
+			FLAG_CARRY		= (FLAG_HALF_CARRY << 1),
+
 		};
 
 		private:
@@ -1533,27 +1534,27 @@ namespace GBMU_NAMESPACE {
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
-		/// Opcode: 0X86, cycles: 4 ( ADD A, (HL) )
+		/// Opcode: 0X86, cycles: 8 ( ADD A, (HL) )
 		static void
 		operAdd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseAdd<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
-		/// Opcode: 0X8E, cycles: 4 ( ADC A, (HL) )
+		/// Opcode: 0X8E, cycles: 8 ( ADC A, (HL) )
 		static void
 		operAddCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
+			operBaseAddCarry<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
-		/// Opcode: 0X96, cycles: 4 ( SUB (HL) )
+		/// Opcode: 0X96, cycles: 8 ( SUB (HL) )
 		static void
 		operSub_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseSub<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
@@ -1561,7 +1562,7 @@ namespace GBMU_NAMESPACE {
 		static void
 		operSubCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
+			operBaseSubCarry<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
@@ -1569,7 +1570,7 @@ namespace GBMU_NAMESPACE {
 		static void
 		operAnd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseAnd<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
@@ -1577,7 +1578,7 @@ namespace GBMU_NAMESPACE {
 		static void
 		operXor_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseXor<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
@@ -1585,7 +1586,7 @@ namespace GBMU_NAMESPACE {
 		static void
 		operOr_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseOr<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
@@ -1593,7 +1594,7 @@ namespace GBMU_NAMESPACE {
 		static void
 		operCp_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
-			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			operBaseCp<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
@@ -1660,6 +1661,314 @@ namespace GBMU_NAMESPACE {
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
+
+
+
+
+
+
+
+		///TODO: CB Prefix here
+
+//
+///TODO: Document SLL
+//
+		// Opcode: 0XCB00, cycles: 8 ( RCL B )
+		// Opcode: 0XCB08, cycles: 8 ( RRC B )
+		// Opcode: 0XCB10, cycles: 8 ( RL B )
+		// Opcode: 0XCB18, cycles: 8 ( RR B )
+		// Opcode: 0XCB20, cycles: 8 ( SLA B )
+		// Opcode: 0XCB28, cycles: 8 ( SRA B )
+		// Opcode: ?, cycles: 8 ( SLL B )
+		// Opcode: 0XCB38, cycles: 8 ( SRL B )
+		// Opcode: 0XCB01, cycles: 8 ( RCL C )
+		// Opcode: 0XCB09, cycles: 8 ( RRC C )
+		// Opcode: 0XCB11, cycles: 8 ( RL C )
+		// Opcode: 0XCB19, cycles: 8 ( RR C )
+		// Opcode: 0XCB21, cycles: 8 ( SLA C )
+		// Opcode: 0XCB29, cycles: 8 ( SRA C )
+		// Opcode: ?, cycles: 8 ( SLL C )
+		// Opcode: 0XCB39, cycles: 8 ( SRL C )
+		// Opcode: 0XCB02, cycles: 8 ( RCL D )
+		// Opcode: 0XCB0A, cycles: 8 ( RRC D )
+		// Opcode: 0XCB12, cycles: 8 ( RL D )
+		// Opcode: 0XCB1A, cycles: 8 ( RR D )
+		// Opcode: 0XCB22, cycles: 8 ( SLA D )
+		// Opcode: 0XCB2A, cycles: 8 ( SRA D )
+		// Opcode: ?, cycles: 8 ( SLL D )
+		// Opcode: 0XCB3A, cycles: 8 ( SRL D )
+		// Opcode: 0XCB03, cycles: 8 ( RCL E )
+		// Opcode: 0XCB0B, cycles: 8 ( RRC E )
+		// Opcode: 0XCB13, cycles: 8 ( RL E )
+		// Opcode: 0XCB1B, cycles: 8 ( RR E )
+		// Opcode: 0XCB23, cycles: 8 ( SLA E )
+		// Opcode: 0XCB2B, cycles: 8 ( SRA E )
+		// Opcode: ?, cycles: 8 ( SLL E )
+		// Opcode: 0XCB3B, cycles: 8 ( SRL E )
+		// Opcode: 0XCB04, cycles: 8 ( RCL H )
+		// Opcode: 0XCB0C, cycles: 8 ( RRC H )
+		// Opcode: 0XCB14, cycles: 8 ( RL H )
+		// Opcode: 0XCB1C, cycles: 8 ( RR H )
+		// Opcode: 0XCB24, cycles: 8 ( SLA H )
+		// Opcode: 0XCB2C, cycles: 8 ( SRA H )
+		// Opcode: ?, cycles: 8 ( SLL H )
+		// Opcode: 0XCB3C, cycles: 8 ( SRL H )
+		// Opcode: 0XCB05, cycles: 8 ( RCL L )
+		// Opcode: 0XCB0D, cycles: 8 ( RRC L )
+		// Opcode: 0XCB15, cycles: 8 ( RL L )
+		// Opcode: 0XCB1D, cycles: 8 ( RR L )
+		// Opcode: 0XCB25, cycles: 8 ( SLA L )
+		// Opcode: 0XCB2D, cycles: 8 ( SRA L )
+		// Opcode: ?, cycles: 8 ( SLL L )
+		// Opcode: 0XCB3D, cycles: 8 ( SRL L )
+		// Opcode: 0XCB06, cycles: 16 ( RCL (HL) )
+		// Opcode: 0XCB0E, cycles: 16 ( RRC (HL) )
+		// Opcode: 0XCB16, cycles: 16 ( RL (HL) )
+		// Opcode: 0XCB1E, cycles: 16 ( RR (HL) )
+		// Opcode: 0XCB26, cycles: 16 ( SLA (HL) )
+		// Opcode: 0XCB2E, cycles: 16 ( SRA (HL) )
+		// Opcode: ?, cycles: 16 ( SLL (HL) )
+		// Opcode: 0XCB3E, cycles: 16 ( SRL (HL) )
+		// Opcode: 0XCB07, cycles: 8 ( RCL A )
+		// Opcode: 0XCB0F, cycles: 8 ( RRC A )
+		// Opcode: 0XCB17, cycles: 8 ( RL A )
+		// Opcode: 0XCB1F, cycles: 8 ( RR A )
+		// Opcode: 0XCB27, cycles: 8 ( SLA A )
+		// Opcode: 0XCB2F, cycles: 8 ( SRA A )
+		// Opcode: ?, cycles: 8 ( SLL A )
+		// Opcode: 0XCB3F, cycles: 8 ( SRL A )
+
+
+
+
+
+
+
+
+
+
+		// Opcode: 0XCB40, cycles: 8 ( BIT 0, B )
+		// Opcode: 0XCB48, cycles: 8 ( BIT 1, B )
+		// Opcode: 0XCB50, cycles: 8 ( BIT 2, B )
+		// Opcode: 0XCB58, cycles: 8 ( BIT 3, B )
+		// Opcode: 0XCB60, cycles: 8 ( BIT 4, B )
+		// Opcode: 0XCB68, cycles: 8 ( BIT 5, B )
+		// Opcode: 0XCB70, cycles: 8 ( BIT 6, B )
+		// Opcode: 0XCB78, cycles: 8 ( BIT 7, B )
+		// Opcode: 0XCB41, cycles: 8 ( BIT 0, C )
+		// Opcode: 0XCB49, cycles: 8 ( BIT 1, C )
+		// Opcode: 0XCB51, cycles: 8 ( BIT 2, C )
+		// Opcode: 0XCB59, cycles: 8 ( BIT 3, C )
+		// Opcode: 0XCB61, cycles: 8 ( BIT 4, C )
+		// Opcode: 0XCB69, cycles: 8 ( BIT 5, C )
+		// Opcode: 0XCB71, cycles: 8 ( BIT 6, C )
+		// Opcode: 0XCB79, cycles: 8 ( BIT 7, C )
+		// Opcode: 0XCB42, cycles: 8 ( BIT 0, D )
+		// Opcode: 0XCB4A, cycles: 8 ( BIT 1, D )
+		// Opcode: 0XCB52, cycles: 8 ( BIT 2, D )
+		// Opcode: 0XCB5A, cycles: 8 ( BIT 3, D )
+		// Opcode: 0XCB62, cycles: 8 ( BIT 4, D )
+		// Opcode: 0XCB6A, cycles: 8 ( BIT 5, D )
+		// Opcode: 0XCB72, cycles: 8 ( BIT 6, D )
+		// Opcode: 0XCB7A, cycles: 8 ( BIT 7, D )
+		// Opcode: 0XCB43, cycles: 8 ( BIT 0, E )
+		// Opcode: 0XCB4B, cycles: 8 ( BIT 1, E )
+		// Opcode: 0XCB53, cycles: 8 ( BIT 2, E )
+		// Opcode: 0XCB5B, cycles: 8 ( BIT 3, E )
+		// Opcode: 0XCB63, cycles: 8 ( BIT 4, E )
+		// Opcode: 0XCB6B, cycles: 8 ( BIT 5, E )
+		// Opcode: 0XCB73, cycles: 8 ( BIT 6, E )
+		// Opcode: 0XCB7B, cycles: 8 ( BIT 7, E )
+		// Opcode: 0XCB44, cycles: 8 ( BIT 0, H )
+		// Opcode: 0XCB4C, cycles: 8 ( BIT 1, H )
+		// Opcode: 0XCB54, cycles: 8 ( BIT 2, H )
+		// Opcode: 0XCB5C, cycles: 8 ( BIT 3, H )
+		// Opcode: 0XCB64, cycles: 8 ( BIT 4, H )
+		// Opcode: 0XCB6C, cycles: 8 ( BIT 5, H )
+		// Opcode: 0XCB74, cycles: 8 ( BIT 6, H )
+		// Opcode: 0XCB7C, cycles: 8 ( BIT 7, H )
+		// Opcode: 0XCB45, cycles: 8 ( BIT 0, L )
+		// Opcode: 0XCB4D, cycles: 8 ( BIT 1, L )
+		// Opcode: 0XCB55, cycles: 8 ( BIT 2, L )
+		// Opcode: 0XCB5D, cycles: 8 ( BIT 3, L )
+		// Opcode: 0XCB65, cycles: 8 ( BIT 4, L )
+		// Opcode: 0XCB6D, cycles: 8 ( BIT 5, L )
+		// Opcode: 0XCB75, cycles: 8 ( BIT 6, L )
+		// Opcode: 0XCB7D, cycles: 8 ( BIT 7, L )
+		// Opcode: 0XCB46, cycles: 16 ( BIT 0, (HL) )
+		// Opcode: 0XCB4E, cycles: 16 ( BIT 1, (HL) )
+		// Opcode: 0XCB56, cycles: 16 ( BIT 2, (HL) )
+		// Opcode: 0XCB5E, cycles: 16 ( BIT 3, (HL) )
+		// Opcode: 0XCB66, cycles: 16 ( BIT 4, (HL) )
+		// Opcode: 0XCB6E, cycles: 16 ( BIT 5, (HL) )
+		// Opcode: 0XCB76, cycles: 16 ( BIT 6, (HL) )
+		// Opcode: 0XCB7E, cycles: 16 ( BIT 7, (HL) )
+		// Opcode: 0XCB47, cycles: 8 ( BIT 0, A )
+		// Opcode: 0XCB4F, cycles: 8 ( BIT 1, A )
+		// Opcode: 0XCB57, cycles: 8 ( BIT 2, A )
+		// Opcode: 0XCB5F, cycles: 8 ( BIT 3, A )
+		// Opcode: 0XCB67, cycles: 8 ( BIT 4, A )
+		// Opcode: 0XCB6F, cycles: 8 ( BIT 5, A )
+		// Opcode: 0XCB77, cycles: 8 ( BIT 6, A )
+		// Opcode: 0XCB7F, cycles: 8 ( BIT 7, A )
+
+
+
+
+
+
+
+
+
+
+
+
+		// Opcode: 0XCB80, cycles: 8 ( RES 0, B )
+		// Opcode: 0XCB88, cycles: 8 ( RES 1, B )
+		// Opcode: 0XCB90, cycles: 8 ( RES 2, B )
+		// Opcode: 0XCB98, cycles: 8 ( RES 3, B )
+		// Opcode: 0XCBA0, cycles: 8 ( RES 4, B )
+		// Opcode: 0XCBA8, cycles: 8 ( RES 5, B )
+		// Opcode: 0XCBB0, cycles: 8 ( RES 6, B )
+		// Opcode: 0XCBB8, cycles: 8 ( RES 7, B )
+		// Opcode: 0XCB81, cycles: 8 ( RES 0, C )
+		// Opcode: 0XCB89, cycles: 8 ( RES 1, C )
+		// Opcode: 0XCB91, cycles: 8 ( RES 2, C )
+		// Opcode: 0XCB99, cycles: 8 ( RES 3, C )
+		// Opcode: 0XCBA1, cycles: 8 ( RES 4, C )
+		// Opcode: 0XCBA9, cycles: 8 ( RES 5, C )
+		// Opcode: 0XCBB1, cycles: 8 ( RES 6, C )
+		// Opcode: 0XCBB9, cycles: 8 ( RES 7, C )
+		// Opcode: 0ZCB82, cycles: 8 ( RES 0, D )
+		// Opcode: 0XCB8A, cycles: 8 ( RES 1, D )
+		// Opcode: 0XCB92, cycles: 8 ( RES 2, D )
+		// Opcode: 0XCB9A, cycles: 8 ( RES 3, D )
+		// Opcode: OXCBA2, cycles: 8 ( RES 4, D )
+		// Opcode: 0XCBAA, cycles: 8 ( RES 5, D )
+		// Opcode: 0XCBB2, cycles: 8 ( RES 6, D )
+		// Opcode: 0XCBBA, cycles: 8 ( RES 7, D )
+		// Opcode: 0XCB83, cycles: 8 ( RES 0, E )
+		// Opcode: 0XCB8B, cycles: 8 ( RES 1, E )
+		// Opcode: 0XCB93, cycles: 8 ( RES 2, E )
+		// Opcode: 0XCB9B, cycles: 8 ( RES 3, E )
+		// Opcode: 0XCBA3, cycles: 8 ( RES 4, E )
+		// Opcode: 0XCBAB, cycles: 8 ( RES 5, E )
+		// Opcode: 0XCBB3, cycles: 8 ( RES 6, E )
+		// Opcode: 0XCBBB, cycles: 8 ( RES 7, E )
+		// Opcode: 0XCB84, cycles: 8 ( RES 0, H )
+		// Opcode: 0XCB8C, cycles: 8 ( RES 1, H )
+		// Opcode: 0XCB94, cycles: 8 ( RES 2, H )
+		// Opcode: 0XCB9C, cycles: 8 ( RES 3, H )
+		// Opcode: 0XCBA4, cycles: 8 ( RES 4, H )
+		// Opcode: 0XCBAC, cycles: 8 ( RES 5, H )
+		// Opcode: 0XCBB4, cycles: 8 ( RES 6, H )
+		// Opcode: 0XCBBC, cycles: 8 ( RES 7, H )
+		// Opcode: 0XCB85, cycles: 8 ( RES 0, L )
+		// Opcode: 0XCB8D, cycles: 8 ( RES 1, L )
+		// Opcode: 0XCB95, cycles: 8 ( RES 2, L )
+		// Opcode: 0XCB9D, cycles: 8 ( RES 3, L )
+		// Opcode: 0XCBA5, cycles: 8 ( RES 4, L )
+		// Opcode: 0XCBAD, cycles: 8 ( RES 5, L )
+		// Opcode: 0XCBB5, cycles: 8 ( RES 6, L )
+		// Opcode: 0XCBBD, cycles: 8 ( RES 7, L )
+		// Opcode: 0XCB86, cycles: 8 ( RES 0, (HL) )
+		// Opcode: 0XCB8E, cycles: 8 ( RES 1, (HL) )
+		// Opcode: 0XCB96, cycles: 8 ( RES 2, (HL) )
+		// Opcode: 0XCB9E, cycles: 8 ( RES 3, (HL) )
+		// Opcode: 0XCBA6, cycles: 8 ( RES 4, (HL) )
+		// Opcode: 0XCBAE, cycles: 8 ( RES 5, (HL) )
+		// Opcode: 0XCBB6, cycles: 8 ( RES 6, (HL) )
+		// Opcode: 0XCBBE, cycles: 8 ( RES 7, (HL) )
+		// Opcode: 0XCB87, cycles: 8 ( RES 0, A )
+		// Opcode: 0XCB8F, cycles: 8 ( RES 1, A )
+		// Opcode: 0XCB97, cycles: 8 ( RES 2, A )
+		// Opcode: 0XCB9F, cycles: 8 ( RES 3, A )
+		// Opcode: 0XCBA7, cycles: 8 ( RES 4, A )
+		// Opcode: 0XCBAF, cycles: 8 ( RES 5, A )
+		// Opcode: 0XCBB7, cycles: 8 ( RES 6, A )
+		// Opcode: 0XCBBF, cycles: 8 ( RES 7, A )
+
+
+
+
+
+
+
+
+
+
+
+
+
+		// Opcode: 0XCBC0, cycles: 8 ( SET 0, B )
+		// Opcode: OXCBC8, cycles: 8 ( SET 1, B )
+		// Opcode: 0XCBD0, cycles: 8 ( SET 2, B )
+		// Opcode: 0XCBD8, cycles: 8 ( SET 3, B )
+		// Opcode: 0XCBE0, cycles: 8 ( SET 4, B )
+		// Opcode: 0XCBE8, cycles: 8 ( SET 5, B )
+		// Opcode: 0XCBF0, cycles: 8 ( SET 6, B )
+		// Opcode: 0XCBF8, cycles: 8 ( SET 7, B )
+		// Opcode: 0XCBC1, cycles: 8 ( SET 0, C )
+		// Opcode: 0XCBC9, cycles: 8 ( SET 1, C )
+		// Opcode: 0XCBD1, cycles: 8 ( SET 2, C )
+		// Opcode: 0XCBD9, cycles: 8 ( SET 3, C )
+		// Opcode: 0XCBE1, cycles: 8 ( SET 4, C )
+		// Opcode: 0XCBE9, cycles: 8 ( SET 5, C )
+		// Opcode: 0XCBF1, cycles: 8 ( SET 6, C )
+		// Opcode: 0XCBF9, cycles: 8 ( SET 7, C )
+		// Opcode: 0XCBC2, cycles: 8 ( SET 0, D )
+		// Opcode: 0CCBCA, cycles: 8 ( SET 1, D )
+		// Opcode: 0XCBD2, cycles: 8 ( SET 2, D )
+		// Opcode: 0XCBDA, cycles: 8 ( SET 3, D )
+		// Opcode: 0XCBE2, cycles: 8 ( SET 4, D )
+		// Opcode: 0XCBEA, cycles: 8 ( SET 5, D )
+		// Opcode: 0XCBF2, cycles: 8 ( SET 6, D )
+		// Opcode: 0XCBFA, cycles: 8 ( SET 7, D )
+		// Opcode: 0XCBC3, cycles: 8 ( SET 0, E )
+		// Opcode: 0XCBCB, cycles: 8 ( SET 1, E )
+		// Opcode: 0XCBD3, cycles: 8 ( SET 2, E )
+		// Opcode: 0XCBDB, cycles: 8 ( SET 3, E )
+		// Opcode: 0XCBE3, cycles: 8 ( SET 4, E )
+		// Opcode: 0XCBEB, cycles: 8 ( SET 5, E )
+		// Opcode: 0XCBF3, cycles: 8 ( SET 6, E )
+		// Opcode: 0XCBFB, cycles: 8 ( SET 7, E )
+		// Opcode: 0XCBC4, cycles: 8 ( SET 0, H )
+		// Opcode: 0XCBCC, cycles: 8 ( SET 1, H )
+		// Opcode: 0XCBD4, cycles: 8 ( SET 2, H )
+		// Opcode: 0XCBDC, cycles: 8 ( SET 3, H )
+		// Opcode: 0XCBE4, cycles: 8 ( SET 4, H )
+		// Opcode: 0XCBEC, cycles: 8 ( SET 5, H )
+		// Opcode: 0XCBF4, cycles: 8 ( SET 6, H )
+		// Opcode: 0XCBFC, cycles: 8 ( SET 7, H )
+		// Opcode: 0XCBC5, cycles: 8 ( SET 0, L )
+		// Opcode: 0XCBCD, cycles: 8 ( SET 1, L )
+		// Opcode: 0XCBD5, cycles: 8 ( SET 2, L )
+		// Opcode: 0XCBDD, cycles: 8 ( SET 3, L )
+		// Opcode: 0XCBE5, cycles: 8 ( SET 4, L )
+		// Opcode: 0XCBED, cycles: 8 ( SET 5, L )
+		// Opcode: 0XCBF5, cycles: 8 ( SET 6, L )
+		// Opcode: OXCBFD, cycles: 8 ( SET 7, L )
+		// Opcode: 0XCBC6, cycles: 16 ( SET 0, (HL) )
+		// Opcode: 0XCBCE, cycles: 16 ( SET 1, (HL) )
+		// Opcode: 0XCBD6, cycles: 16 ( SET 2, (HL) )
+		// Opcode: 0XCBDE, cycles: 16 ( SET 3, (HL) )
+		// Opcode: 0XCBE6, cycles: 16 ( SET 4, (HL) )
+		// Opcode: 0XCBEE, cycles: 16 ( SET 5, (HL) )
+		// Opcode: 0XCBF6, cycles: 16 ( SET 6, (HL) )
+		// Opcode: 0XCBFE, cycles: 16 ( SET 7, (HL) )
+		// Opcode: 0XCBC7, cycles: 8 ( SET 0, A )
+		// Opcode: 0XCBCF, cycles: 8 ( SET 1, A )
+		// Opcode: 0XCBD7, cycles: 8 ( SET 2, A )
+		// Opcode: 0XCBDF, cycles: 8 ( SET 3, A )
+		// Opcode: 0XCBE7, cycles: 8 ( SET 4, A )
+		// Opcode: 0XCBEF, cycles: 8 ( SET 5, A )
+		// Opcode: 0XCBF7, cycles: 8 ( SET 6, A )
+		// Opcode: 0XCBFF, cycles: 8 ( SET 7, A )
+
+
+
+
+
 
 		///////////////////////////////////////////////////////
 		// All operations are indexed & statically preloaded //
