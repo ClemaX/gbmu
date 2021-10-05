@@ -29,9 +29,17 @@
 # define CLOCK_CYCLE_MS (CLOCK_CYCLE_S * 1000.0)
 # define CLOCK_CYCLE_NS (CLOCK_CYCLE_MS * 1000000.0)
 
-# define FGMASK_ADD(target, mask) (target |= mask)
-# define FGMASK_DEL(target, mask) (target &Z N H C= ~mask)
-# define FGMASK_HAS(target, mask) (target & mask)
+# define MASKBIT0 (1 << 0)
+# define MASKBIT1 (MASKBIT0 << 1)
+# define MASKBIT2 (MASKBIT1 << 1)
+# define MASKBIT3 (MASKBIT2 << 1)
+# define MASKBIT4 (MASKBIT3 << 1)
+# define MASKBIT5 (MASKBIT4 << 1)
+# define MASKBIT6 (MASKBIT5 << 1)
+# define MASKBIT7 (MASKBIT6 << 1)
+# define FGMASK_ADD(target, mask) ((target) |= (mask))
+# define FGMASK_DEL(target, mask) ((target) &= ~(mask))
+# define FGMASK_HAS(target, mask) ((target) & (mask))
 
 namespace GBMU_NAMESPACE {
 
@@ -464,6 +472,48 @@ namespace GBMU_NAMESPACE {
 			static_cast<void>(dest);
 			static_cast<void>(src);
 			///TODO:
+			c.setCycles(cycles);
+		}
+
+		template <typename T, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseSet(T& dest, T bitMask, Chrono& c)
+		noexcept
+		{
+			FGMASK_ADD(dest, bitMask);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRes(T& dest, T bitMask, Chrono& c)
+		noexcept
+		{
+			FGMASK_DEL(dest, bitMask);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseBit(T& dest, T bitMask, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if bit b of register r is 0.
+  				N - Reset.
+  				H - Set.
+  				C - Not affected.
+			*/
+			static_cast<void>(flags);
+
+
+			if (FGMASK_HAS(dest, bitMask) == false)
+				; // Set Z flag
+			// Reset N flag
+			// Set H flag
 			c.setCycles(cycles);
 		}
 
@@ -1662,14 +1712,9 @@ namespace GBMU_NAMESPACE {
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
-
-
-
-
-
-
-		///TODO: CB Prefix here
-
+		//////////////////////////////////
+		// ROTATES & SHIFTS OPEREATIONS //
+		//////////////////////////////////
 //
 ///TODO: Document SLL
 //
@@ -1746,224 +1791,977 @@ namespace GBMU_NAMESPACE {
 
 
 
-
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
 		// Opcode: 0XCB40, cycles: 8 ( BIT 0, B )
+		static void
+		operBit_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB48, cycles: 8 ( BIT 1, B )
+		static void
+		operBit_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB50, cycles: 8 ( BIT 2, B )
+		static void
+		operBit_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB58, cycles: 8 ( BIT 3, B )
+		static void
+		operBit_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB60, cycles: 8 ( BIT 4, B )
+		static void
+		operBit_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB68, cycles: 8 ( BIT 5, B )
+		static void
+		operBit_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB70, cycles: 8 ( BIT 6, B )
+		static void
+		operBit_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB78, cycles: 8 ( BIT 7, B )
+		static void
+		operBit_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB41, cycles: 8 ( BIT 0, C )
+		static void
+		operBit_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB49, cycles: 8 ( BIT 1, C )
+		static void
+		operBit_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB51, cycles: 8 ( BIT 2, C )
+		static void
+		operBit_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB59, cycles: 8 ( BIT 3, C )
+		static void
+		operBit_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB61, cycles: 8 ( BIT 4, C )
+		static void
+		operBit_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB69, cycles: 8 ( BIT 5, C )
+		static void
+		operBit_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB71, cycles: 8 ( BIT 6, C )
+		static void
+		operBit_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB79, cycles: 8 ( BIT 7, C )
+		static void
+		operBit_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB42, cycles: 8 ( BIT 0, D )
+		static void
+		operBit_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4A, cycles: 8 ( BIT 1, D )
+		static void
+		operBit_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB52, cycles: 8 ( BIT 2, D )
+		static void
+		operBit_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5A, cycles: 8 ( BIT 3, D )
+		static void
+		operBit_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB62, cycles: 8 ( BIT 4, D )
+		static void
+		operBit_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6A, cycles: 8 ( BIT 5, D )
+		static void
+		operBit_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB72, cycles: 8 ( BIT 6, D )
+		static void
+		operBit_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7A, cycles: 8 ( BIT 7, D )
+		static void
+		operBit_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB43, cycles: 8 ( BIT 0, E )
+		static void
+		operBit_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4B, cycles: 8 ( BIT 1, E )
+		static void
+		operBit_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB53, cycles: 8 ( BIT 2, E )
+		static void
+		operBit_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5B, cycles: 8 ( BIT 3, E )
+		static void
+		operBit_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB63, cycles: 8 ( BIT 4, E )
+		static void
+		operBit_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6B, cycles: 8 ( BIT 5, E )
+		static void
+		operBit_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB73, cycles: 8 ( BIT 6, E )
+		static void
+		operBit_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7B, cycles: 8 ( BIT 7, E )
+		static void
+		operBit_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB44, cycles: 8 ( BIT 0, H )
+		static void
+		operBit_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4C, cycles: 8 ( BIT 1, H )
+		static void
+		operBit_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB54, cycles: 8 ( BIT 2, H )
+		static void
+		operBit_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5C, cycles: 8 ( BIT 3, H )
+		static void
+		operBit_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB64, cycles: 8 ( BIT 4, H )
+		static void
+		operBit_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6C, cycles: 8 ( BIT 5, H )
+		static void
+		operBit_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB74, cycles: 8 ( BIT 6, H )
+		static void
+		operBit_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7C, cycles: 8 ( BIT 7, H )
+		static void
+		operBit_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB45, cycles: 8 ( BIT 0, L )
+		static void
+		operBit_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4D, cycles: 8 ( BIT 1, L )
+		static void
+		operBit_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB55, cycles: 8 ( BIT 2, L )
+		static void
+		operBit_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5D, cycles: 8 ( BIT 3, L )
+		static void
+		operBit_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB65, cycles: 8 ( BIT 4, L )
+		static void
+		operBit_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6D, cycles: 8 ( BIT 5, L )
+		static void
+		operBit_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB75, cycles: 8 ( BIT 6, L )
+		static void
+		operBit_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7D, cycles: 8 ( BIT 7, L )
+		static void
+		operBit_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB46, cycles: 16 ( BIT 0, (HL) )
+		static void
+		operBit_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4E, cycles: 16 ( BIT 1, (HL) )
+		static void
+		operBit_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB56, cycles: 16 ( BIT 2, (HL) )
+		static void
+		operBit_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5E, cycles: 16 ( BIT 3, (HL) )
+		static void
+		operBit_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB66, cycles: 16 ( BIT 4, (HL) )
+		static void
+		operBit_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6E, cycles: 16 ( BIT 5, (HL) )
+		static void
+		operBit_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB76, cycles: 16 ( BIT 6, (HL) )
+		static void
+		operBit_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7E, cycles: 16 ( BIT 7, (HL) )
+		static void
+		operBit_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT7, core.flags, c); }
+
 		// Opcode: 0XCB47, cycles: 8 ( BIT 0, A )
+		static void
+		operBit_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT0, core.flags, c); }
+
 		// Opcode: 0XCB4F, cycles: 8 ( BIT 1, A )
+		static void
+		operBit_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT1, core.flags, c); }
+
 		// Opcode: 0XCB57, cycles: 8 ( BIT 2, A )
+		static void
+		operBit_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT2, core.flags, c); }
+
 		// Opcode: 0XCB5F, cycles: 8 ( BIT 3, A )
+		static void
+		operBit_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT3, core.flags, c); }
+
 		// Opcode: 0XCB67, cycles: 8 ( BIT 4, A )
+		static void
+		operBit_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT4, core.flags, c); }
+
 		// Opcode: 0XCB6F, cycles: 8 ( BIT 5, A )
+		static void
+		operBit_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT5, core.flags, c); }
+
 		// Opcode: 0XCB77, cycles: 8 ( BIT 6, A )
+		static void
+		operBit_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT6, core.flags, c); }
+
 		// Opcode: 0XCB7F, cycles: 8 ( BIT 7, A )
+		static void
+		operBit_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT7, core.flags, c); }
 
-
-
-
-
-
-
-
-
-
-
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
 
 		// Opcode: 0XCB80, cycles: 8 ( RES 0, B )
+		static void
+		operRes_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
+
 		// Opcode: 0XCB88, cycles: 8 ( RES 1, B )
+		static void
+		operRes_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
+
 		// Opcode: 0XCB90, cycles: 8 ( RES 2, B )
+		static void
+		operRes_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
+
 		// Opcode: 0XCB98, cycles: 8 ( RES 3, B )
+		static void
+		operRes_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
+
 		// Opcode: 0XCBA0, cycles: 8 ( RES 4, B )
+		static void
+		operRes_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
+
 		// Opcode: 0XCBA8, cycles: 8 ( RES 5, B )
+		static void
+		operRes_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
+
 		// Opcode: 0XCBB0, cycles: 8 ( RES 6, B )
+		static void
+		operRes_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
+
 		// Opcode: 0XCBB8, cycles: 8 ( RES 7, B )
+		static void
+		operRes_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
+
 		// Opcode: 0XCB81, cycles: 8 ( RES 0, C )
+		static void
+		operRes_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
+
 		// Opcode: 0XCB89, cycles: 8 ( RES 1, C )
+		static void
+		operRes_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
+
 		// Opcode: 0XCB91, cycles: 8 ( RES 2, C )
+		static void
+		operRes_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
+
 		// Opcode: 0XCB99, cycles: 8 ( RES 3, C )
+		static void
+		operRes_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
+
 		// Opcode: 0XCBA1, cycles: 8 ( RES 4, C )
+		static void
+		operRes_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
+
 		// Opcode: 0XCBA9, cycles: 8 ( RES 5, C )
+		static void
+		operRes_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
+
 		// Opcode: 0XCBB1, cycles: 8 ( RES 6, C )
+		static void
+		operRes_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
+
 		// Opcode: 0XCBB9, cycles: 8 ( RES 7, C )
+		static void
+		operRes_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
+
 		// Opcode: 0ZCB82, cycles: 8 ( RES 0, D )
+		static void
+		operRes_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT0, c); }
+
 		// Opcode: 0XCB8A, cycles: 8 ( RES 1, D )
+		static void
+		operRes_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT1, c); }
+
 		// Opcode: 0XCB92, cycles: 8 ( RES 2, D )
+		static void
+		operRes_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT2, c); }
+
 		// Opcode: 0XCB9A, cycles: 8 ( RES 3, D )
+		static void
+		operRes_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT3, c); }
+
 		// Opcode: OXCBA2, cycles: 8 ( RES 4, D )
+		static void
+		operRes_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT4, c); }
+
 		// Opcode: 0XCBAA, cycles: 8 ( RES 5, D )
+		static void
+		operRes_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT5, c); }
+
 		// Opcode: 0XCBB2, cycles: 8 ( RES 6, D )
+		static void
+		operRes_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT6, c); }
+
 		// Opcode: 0XCBBA, cycles: 8 ( RES 7, D )
+		static void
+		operRes_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT7, c); }
+
 		// Opcode: 0XCB83, cycles: 8 ( RES 0, E )
+		static void
+		operRes_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT0, c); }
+
 		// Opcode: 0XCB8B, cycles: 8 ( RES 1, E )
+		static void
+		operRes_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT1, c); }
+
 		// Opcode: 0XCB93, cycles: 8 ( RES 2, E )
+		static void
+		operRes_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT2, c); }
+
 		// Opcode: 0XCB9B, cycles: 8 ( RES 3, E )
+		static void
+		operRes_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT3, c); }
+
 		// Opcode: 0XCBA3, cycles: 8 ( RES 4, E )
+		static void
+		operRes_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT4, c); }
+
 		// Opcode: 0XCBAB, cycles: 8 ( RES 5, E )
+		static void
+		operRes_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT5, c); }
+
 		// Opcode: 0XCBB3, cycles: 8 ( RES 6, E )
+		static void
+		operRes_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT6, c); }
+
 		// Opcode: 0XCBBB, cycles: 8 ( RES 7, E )
+		static void
+		operRes_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT7, c); }
+
 		// Opcode: 0XCB84, cycles: 8 ( RES 0, H )
+		static void
+		operRes_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
+
 		// Opcode: 0XCB8C, cycles: 8 ( RES 1, H )
+		static void
+		operRes_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
+
 		// Opcode: 0XCB94, cycles: 8 ( RES 2, H )
+		static void
+		operRes_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
+
 		// Opcode: 0XCB9C, cycles: 8 ( RES 3, H )
+		static void
+		operRes_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
+
 		// Opcode: 0XCBA4, cycles: 8 ( RES 4, H )
+		static void
+		operRes_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
+
 		// Opcode: 0XCBAC, cycles: 8 ( RES 5, H )
+		static void
+		operRes_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
+
 		// Opcode: 0XCBB4, cycles: 8 ( RES 6, H )
+		static void
+		operRes_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
+
 		// Opcode: 0XCBBC, cycles: 8 ( RES 7, H )
+		static void
+		operRes_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
+
 		// Opcode: 0XCB85, cycles: 8 ( RES 0, L )
+		static void
+		operRes_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
+
 		// Opcode: 0XCB8D, cycles: 8 ( RES 1, L )
+		static void
+		operRes_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
+
 		// Opcode: 0XCB95, cycles: 8 ( RES 2, L )
+		static void
+		operRes_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT2, c); }
+
 		// Opcode: 0XCB9D, cycles: 8 ( RES 3, L )
+		static void
+		operRes_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+
 		// Opcode: 0XCBA5, cycles: 8 ( RES 4, L )
+		static void
+		operRes_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
+
 		// Opcode: 0XCBAD, cycles: 8 ( RES 5, L )
+		static void
+		operRes_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
+
 		// Opcode: 0XCBB5, cycles: 8 ( RES 6, L )
+		static void
+		operRes_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
+
 		// Opcode: 0XCBBD, cycles: 8 ( RES 7, L )
+		static void
+		operRes_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
+
 		// Opcode: 0XCB86, cycles: 8 ( RES 0, (HL) )
+		static void
+		operRes_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
+
 		// Opcode: 0XCB8E, cycles: 8 ( RES 1, (HL) )
+		static void
+		operRes_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
+
 		// Opcode: 0XCB96, cycles: 8 ( RES 2, (HL) )
+		static void
+		operRes_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
+
 		// Opcode: 0XCB9E, cycles: 8 ( RES 3, (HL) )
+		static void
+		operRes_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
+
 		// Opcode: 0XCBA6, cycles: 8 ( RES 4, (HL) )
+		static void
+		operRes_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
+
 		// Opcode: 0XCBAE, cycles: 8 ( RES 5, (HL) )
+		static void
+		operRes_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
+
 		// Opcode: 0XCBB6, cycles: 8 ( RES 6, (HL) )
+		static void
+		operRes_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
+
 		// Opcode: 0XCBBE, cycles: 8 ( RES 7, (HL) )
+		static void
+		operRes_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
+
 		// Opcode: 0XCB87, cycles: 8 ( RES 0, A )
+		static void
+		operRes_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT0, c); }
+
 		// Opcode: 0XCB8F, cycles: 8 ( RES 1, A )
+		static void
+		operRes_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT1, c); }
+
 		// Opcode: 0XCB97, cycles: 8 ( RES 2, A )
+		static void
+		operRes_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT2, c); }
+
 		// Opcode: 0XCB9F, cycles: 8 ( RES 3, A )
+		static void
+		operRes_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT3, c); }
+
 		// Opcode: 0XCBA7, cycles: 8 ( RES 4, A )
+		static void
+		operRes_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT4, c); }
+
 		// Opcode: 0XCBAF, cycles: 8 ( RES 5, A )
+		static void
+		operRes_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT5, c); }
+
 		// Opcode: 0XCBB7, cycles: 8 ( RES 6, A )
+		static void
+		operRes_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT6, c); }
+
 		// Opcode: 0XCBBF, cycles: 8 ( RES 7, A )
+		static void
+		operRes_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT7, c); }
 
-
-
-
-
-
-
-
-
-
-
-
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
 
 		// Opcode: 0XCBC0, cycles: 8 ( SET 0, B )
+		static void
+		operSet_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
+
 		// Opcode: OXCBC8, cycles: 8 ( SET 1, B )
+		static void
+		operSet_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
+
 		// Opcode: 0XCBD0, cycles: 8 ( SET 2, B )
+		static void
+		operSet_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
+
 		// Opcode: 0XCBD8, cycles: 8 ( SET 3, B )
+		static void
+		operSet_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
+
 		// Opcode: 0XCBE0, cycles: 8 ( SET 4, B )
+		static void
+		operSet_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
+
 		// Opcode: 0XCBE8, cycles: 8 ( SET 5, B )
+		static void
+		operSet_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
+
 		// Opcode: 0XCBF0, cycles: 8 ( SET 6, B )
+		static void
+		operSet_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
+
 		// Opcode: 0XCBF8, cycles: 8 ( SET 7, B )
+		static void
+		operSet_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
+
 		// Opcode: 0XCBC1, cycles: 8 ( SET 0, C )
+		static void
+		operSet_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
+
 		// Opcode: 0XCBC9, cycles: 8 ( SET 1, C )
+		static void
+		operSet_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
+
 		// Opcode: 0XCBD1, cycles: 8 ( SET 2, C )
+		static void
+		operSet_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
+
 		// Opcode: 0XCBD9, cycles: 8 ( SET 3, C )
+		static void
+		operSet_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
+
 		// Opcode: 0XCBE1, cycles: 8 ( SET 4, C )
+		static void
+		operSet_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
+
 		// Opcode: 0XCBE9, cycles: 8 ( SET 5, C )
+		static void
+		operSet_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
+
 		// Opcode: 0XCBF1, cycles: 8 ( SET 6, C )
+		static void
+		operSet_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
+
 		// Opcode: 0XCBF9, cycles: 8 ( SET 7, C )
+		static void
+		operSet_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
+
 		// Opcode: 0XCBC2, cycles: 8 ( SET 0, D )
+		static void
+		operSet_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT0, c); }
+
 		// Opcode: 0CCBCA, cycles: 8 ( SET 1, D )
+		static void
+		operSet_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT1, c); }
+
 		// Opcode: 0XCBD2, cycles: 8 ( SET 2, D )
+		static void
+		operSet_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT2, c); }
+
 		// Opcode: 0XCBDA, cycles: 8 ( SET 3, D )
+		static void
+		operSet_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT3, c); }
+
 		// Opcode: 0XCBE2, cycles: 8 ( SET 4, D )
+		static void
+		operSet_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT4, c); }
+
 		// Opcode: 0XCBEA, cycles: 8 ( SET 5, D )
+		static void
+		operSet_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT5, c); }
+
 		// Opcode: 0XCBF2, cycles: 8 ( SET 6, D )
+		static void
+		operSet_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT6, c); }
+
 		// Opcode: 0XCBFA, cycles: 8 ( SET 7, D )
+		static void
+		operSet_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT7, c); }
+
 		// Opcode: 0XCBC3, cycles: 8 ( SET 0, E )
+		static void
+		operSet_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT0, c); }
+
 		// Opcode: 0XCBCB, cycles: 8 ( SET 1, E )
+		static void
+		operSet_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT1, c); }
+
 		// Opcode: 0XCBD3, cycles: 8 ( SET 2, E )
+		static void
+		operSet_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT2, c); }
+
 		// Opcode: 0XCBDB, cycles: 8 ( SET 3, E )
+		static void
+		operSet_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT3, c); }
+
 		// Opcode: 0XCBE3, cycles: 8 ( SET 4, E )
+		static void
+		operSet_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT4, c); }
+
 		// Opcode: 0XCBEB, cycles: 8 ( SET 5, E )
+		static void
+		operSet_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT5, c); }
+
 		// Opcode: 0XCBF3, cycles: 8 ( SET 6, E )
+		static void
+		operSet_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT6, c); }
+
 		// Opcode: 0XCBFB, cycles: 8 ( SET 7, E )
+		static void
+		operSet_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT7, c); }
+
 		// Opcode: 0XCBC4, cycles: 8 ( SET 0, H )
+		static void
+		operSet_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
+
 		// Opcode: 0XCBCC, cycles: 8 ( SET 1, H )
+		static void
+		operSet_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
+
 		// Opcode: 0XCBD4, cycles: 8 ( SET 2, H )
+		static void
+		operSet_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
+
 		// Opcode: 0XCBDC, cycles: 8 ( SET 3, H )
+		static void
+		operSet_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
+
 		// Opcode: 0XCBE4, cycles: 8 ( SET 4, H )
+		static void
+		operSet_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
+
 		// Opcode: 0XCBEC, cycles: 8 ( SET 5, H )
+		static void
+		operSet_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
+
 		// Opcode: 0XCBF4, cycles: 8 ( SET 6, H )
+		static void
+		operSet_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
+
 		// Opcode: 0XCBFC, cycles: 8 ( SET 7, H )
+		static void
+		operSet_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
+
 		// Opcode: 0XCBC5, cycles: 8 ( SET 0, L )
+		static void
+		operSet_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
+
 		// Opcode: 0XCBCD, cycles: 8 ( SET 1, L )
+		static void
+		operSet_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
+
 		// Opcode: 0XCBD5, cycles: 8 ( SET 2, L )
+		static void
+		operSet_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+
 		// Opcode: 0XCBDD, cycles: 8 ( SET 3, L )
+		static void
+		operSet_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+
 		// Opcode: 0XCBE5, cycles: 8 ( SET 4, L )
+		static void
+		operSet_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
+
 		// Opcode: 0XCBED, cycles: 8 ( SET 5, L )
+		static void
+		operSet_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
+
 		// Opcode: 0XCBF5, cycles: 8 ( SET 6, L )
+		static void
+		operSet_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
+
 		// Opcode: OXCBFD, cycles: 8 ( SET 7, L )
+		static void
+		operSet_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
+
 		// Opcode: 0XCBC6, cycles: 16 ( SET 0, (HL) )
+		static void
+		operSet_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
+
 		// Opcode: 0XCBCE, cycles: 16 ( SET 1, (HL) )
+		static void
+		operSet_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
+
 		// Opcode: 0XCBD6, cycles: 16 ( SET 2, (HL) )
+		static void
+		operSet_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
+
 		// Opcode: 0XCBDE, cycles: 16 ( SET 3, (HL) )
+		static void
+		operSet_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
+
 		// Opcode: 0XCBE6, cycles: 16 ( SET 4, (HL) )
+		static void
+		operSet_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
+
 		// Opcode: 0XCBEE, cycles: 16 ( SET 5, (HL) )
+		static void
+		operSet_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
+
 		// Opcode: 0XCBF6, cycles: 16 ( SET 6, (HL) )
+		static void
+		operSet_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
+
 		// Opcode: 0XCBFE, cycles: 16 ( SET 7, (HL) )
+		static void
+		operSet_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
+
 		// Opcode: 0XCBC7, cycles: 8 ( SET 0, A )
+		static void
+		operSet_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT0, c); }
+
 		// Opcode: 0XCBCF, cycles: 8 ( SET 1, A )
+		static void
+		operSet_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT1, c); }
+
 		// Opcode: 0XCBD7, cycles: 8 ( SET 2, A )
+		static void
+		operSet_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT2, c); }
+
 		// Opcode: 0XCBDF, cycles: 8 ( SET 3, A )
+		static void
+		operSet_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT3, c); }
+
 		// Opcode: 0XCBE7, cycles: 8 ( SET 4, A )
+		static void
+		operSet_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT4, c); }
+
 		// Opcode: 0XCBEF, cycles: 8 ( SET 5, A )
+		static void
+		operSet_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT5, c); }
+
 		// Opcode: 0XCBF7, cycles: 8 ( SET 6, A )
+		static void
+		operSet_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT6, c); }
+
 		// Opcode: 0XCBFF, cycles: 8 ( SET 7, A )
+		static void
+		operSet_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT7, c); }
+
 
 
 
@@ -10128,24 +10926,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inB
 							}
 						},
 						/* Y = 1 */
@@ -10153,24 +10951,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inB
 							}
 						},
 						/* Y = 2 */
@@ -10178,24 +10976,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inB
 							}
 						},
 						/* Y = 3 */
@@ -10203,24 +11001,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inB
 							}
 						},
 						/* Y = 4 */
@@ -10228,24 +11026,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inB
 							}
 						},
 						/* Y = 5 */
@@ -10253,24 +11051,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inB
 							}
 						},
 						/* Y = 6 */
@@ -10278,24 +11076,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inB
 							}
 						},
 						/* Y = 7 */
@@ -10303,24 +11101,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inB
 							}
 						}
 					},
@@ -10331,24 +11129,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inC
 							}
 						},
 						/* Y = 1 */
@@ -10356,24 +11154,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inC
 							}
 						},
 						/* Y = 2 */
@@ -10381,24 +11179,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inC
 							}
 						},
 						/* Y = 3 */
@@ -10406,24 +11204,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inC
 							}
 						},
 						/* Y = 4 */
@@ -10431,24 +11229,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inC
 							}
 						},
 						/* Y = 5 */
@@ -10456,24 +11254,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inC
 							}
 						},
 						/* Y = 6 */
@@ -10481,24 +11279,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inC
 							}
 						},
 						/* Y = 7 */
@@ -10506,24 +11304,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inC
 							}
 						}
 					},
@@ -10534,24 +11332,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inD
 							}
 						},
 						/* Y = 1 */
@@ -10559,24 +11357,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inD
 							}
 						},
 						/* Y = 2 */
@@ -10584,24 +11382,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inD
 							}
 						},
 						/* Y = 3 */
@@ -10609,24 +11407,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inD
 							}
 						},
 						/* Y = 4 */
@@ -10634,24 +11432,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inD
 							}
 						},
 						/* Y = 5 */
@@ -10659,24 +11457,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inD
 							}
 						},
 						/* Y = 6 */
@@ -10684,24 +11482,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inD
 							}
 						},
 						/* Y = 7 */
@@ -10709,24 +11507,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inD
 							}
 						}
 					},
@@ -10737,24 +11535,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inE
 							}
 						},
 						/* Y = 1 */
@@ -10762,24 +11560,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inE
 							}
 						},
 						/* Y = 2 */
@@ -10787,24 +11585,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inE
 							}
 						},
 						/* Y = 3 */
@@ -10812,24 +11610,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inE
 							}
 						},
 						/* Y = 4 */
@@ -10837,24 +11635,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inE
 							}
 						},
 						/* Y = 5 */
@@ -10862,24 +11660,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inE
 							}
 						},
 						/* Y = 6 */
@@ -10887,24 +11685,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inE
 							}
 						},
 						/* Y = 7 */
@@ -10912,24 +11710,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inE
 							}
 						}
 					},
@@ -10940,24 +11738,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inH
 							}
 						},
 						/* Y = 1 */
@@ -10965,24 +11763,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inH
 							}
 						},
 						/* Y = 2 */
@@ -10990,24 +11788,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inH
 							}
 						},
 						/* Y = 3 */
@@ -11015,24 +11813,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inH
 							}
 						},
 						/* Y = 4 */
@@ -11040,24 +11838,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inH
 							}
 						},
 						/* Y = 5 */
@@ -11065,24 +11863,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inH
 							}
 						},
 						/* Y = 6 */
@@ -11090,24 +11888,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inH
 							}
 						},
 						/* Y = 7 */
@@ -11115,24 +11913,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inH
 							}
 						}
 					},
@@ -11143,24 +11941,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inL
 							}
 						},
 						/* Y = 1 */
@@ -11168,24 +11966,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inL
 							}
 						},
 						/* Y = 2 */
@@ -11193,24 +11991,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inL
 							}
 						},
 						/* Y = 3 */
@@ -11218,24 +12016,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inL
 							}
 						},
 						/* Y = 4 */
@@ -11243,24 +12041,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inL
 							}
 						},
 						/* Y = 5 */
@@ -11268,24 +12066,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inL
 							}
 						},
 						/* Y = 6 */
@@ -11293,24 +12091,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inL
 							}
 						},
 						/* Y = 7 */
@@ -11318,24 +12116,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inL
 							}
 						}
 					},
@@ -11346,24 +12144,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inPAddrHL
 							}
 						},
 						/* Y = 1 */
@@ -11371,24 +12169,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inPAddrHL
 							}
 						},
 						/* Y = 2 */
@@ -11396,24 +12194,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inPAddrHL
 							}
 						},
 						/* Y = 3 */
@@ -11421,24 +12219,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inPAddrHL
 							}
 						},
 						/* Y = 4 */
@@ -11446,24 +12244,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inPAddrHL
 							}
 						},
 						/* Y = 5 */
@@ -11471,24 +12269,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inPAddrHL
 							}
 						},
 						/* Y = 6 */
@@ -11496,24 +12294,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -11521,24 +12319,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inPAddrHL
 							}
 						}
 					},
@@ -11549,24 +12347,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit0inA
 							}
 						},
 						/* Y = 1 */
@@ -11574,24 +12372,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit1inA
 							}
 						},
 						/* Y = 2 */
@@ -11599,24 +12397,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit2inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit2inA
 							}
 						},
 						/* Y = 3 */
@@ -11624,24 +12422,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit3inA
 							}
 						},
 						/* Y = 4 */
@@ -11649,24 +12447,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit4inA
 							}
 						},
 						/* Y = 5 */
@@ -11674,24 +12472,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit5inA
 							}
 						},
 						/* Y = 6 */
@@ -11699,24 +12497,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit6inA
 							}
 						},
 						/* Y = 7 */
@@ -11724,24 +12522,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operBit_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operBit_Bit7inA
 							}
 						}
 					}
@@ -11755,24 +12553,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inB
 							}
 						},
 						/* Y = 1 */
@@ -11780,24 +12578,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inB
 							}
 						},
 						/* Y = 2 */
@@ -11805,24 +12603,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inB
 							}
 						},
 						/* Y = 3 */
@@ -11830,24 +12628,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inB
 							}
 						},
 						/* Y = 4 */
@@ -11855,24 +12653,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inB
 							}
 						},
 						/* Y = 5 */
@@ -11880,24 +12678,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inB
 							}
 						},
 						/* Y = 6 */
@@ -11905,24 +12703,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inB
 							}
 						},
 						/* Y = 7 */
@@ -11930,24 +12728,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inB
 							}
 						}
 					},
@@ -11958,24 +12756,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inC
 							}
 						},
 						/* Y = 1 */
@@ -11983,24 +12781,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inC
 							}
 						},
 						/* Y = 2 */
@@ -12008,24 +12806,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inC
 							}
 						},
 						/* Y = 3 */
@@ -12033,24 +12831,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inC
 							}
 						},
 						/* Y = 4 */
@@ -12058,24 +12856,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inC
 							}
 						},
 						/* Y = 5 */
@@ -12083,24 +12881,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inC
 							}
 						},
 						/* Y = 6 */
@@ -12108,24 +12906,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inC
 							}
 						},
 						/* Y = 7 */
@@ -12133,24 +12931,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inC
 							}
 						}
 					},
@@ -12161,24 +12959,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inD
 							}
 						},
 						/* Y = 1 */
@@ -12186,24 +12984,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inD
 							}
 						},
 						/* Y = 2 */
@@ -12211,24 +13009,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inD
 							}
 						},
 						/* Y = 3 */
@@ -12236,24 +13034,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inD
 							}
 						},
 						/* Y = 4 */
@@ -12261,24 +13059,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inD
 							}
 						},
 						/* Y = 5 */
@@ -12286,24 +13084,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inD
 							}
 						},
 						/* Y = 6 */
@@ -12311,24 +13109,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inD
 							}
 						},
 						/* Y = 7 */
@@ -12336,24 +13134,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inD
 							}
 						}
 					},
@@ -12364,24 +13162,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inE
 							}
 						},
 						/* Y = 1 */
@@ -12389,24 +13187,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inE
 							}
 						},
 						/* Y = 2 */
@@ -12414,24 +13212,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inE
 							}
 						},
 						/* Y = 3 */
@@ -12439,24 +13237,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inE
 							}
 						},
 						/* Y = 4 */
@@ -12464,24 +13262,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inE
 							}
 						},
 						/* Y = 5 */
@@ -12489,24 +13287,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inE
 							}
 						},
 						/* Y = 6 */
@@ -12514,24 +13312,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inE
 							}
 						},
 						/* Y = 7 */
@@ -12539,24 +13337,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inE
 							}
 						}
 					},
@@ -12567,24 +13365,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inH
 							}
 						},
 						/* Y = 1 */
@@ -12592,24 +13390,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inH
 							}
 						},
 						/* Y = 2 */
@@ -12617,24 +13415,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inH
 							}
 						},
 						/* Y = 3 */
@@ -12642,24 +13440,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inH
 							}
 						},
 						/* Y = 4 */
@@ -12667,24 +13465,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inH
 							}
 						},
 						/* Y = 5 */
@@ -12692,24 +13490,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inH
 							}
 						},
 						/* Y = 6 */
@@ -12717,24 +13515,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inH
 							}
 						},
 						/* Y = 7 */
@@ -12742,24 +13540,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inH
 							}
 						}
 					},
@@ -12770,24 +13568,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inL
 							}
 						},
 						/* Y = 1 */
@@ -12795,24 +13593,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inL
 							}
 						},
 						/* Y = 2 */
@@ -12820,24 +13618,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inL
 							}
 						},
 						/* Y = 3 */
@@ -12845,24 +13643,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inL
 							}
 						},
 						/* Y = 4 */
@@ -12870,24 +13668,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inL
 							}
 						},
 						/* Y = 5 */
@@ -12895,24 +13693,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inL
 							}
 						},
 						/* Y = 6 */
@@ -12920,24 +13718,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inL
 							}
 						},
 						/* Y = 7 */
@@ -12945,24 +13743,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inL
 							}
 						}
 					},
@@ -12973,24 +13771,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inPAddrHL
 							}
 						},
 						/* Y = 1 */
@@ -12998,24 +13796,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inPAddrHL
 							}
 						},
 						/* Y = 2 */
@@ -13023,24 +13821,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inPAddrHL
 							}
 						},
 						/* Y = 3 */
@@ -13048,24 +13846,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inPAddrHL
 							}
 						},
 						/* Y = 4 */
@@ -13073,24 +13871,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inPAddrHL
 							}
 						},
 						/* Y = 5 */
@@ -13098,24 +13896,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inPAddrHL
 							}
 						},
 						/* Y = 6 */
@@ -13123,24 +13921,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -13148,24 +13946,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inPAddrHL
 							}
 						}
 					},
@@ -13176,24 +13974,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit0inA
 							}
 						},
 						/* Y = 1 */
@@ -13201,24 +13999,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit1inA
 							}
 						},
 						/* Y = 2 */
@@ -13226,24 +14024,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit2inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit2inA
 							}
 						},
 						/* Y = 3 */
@@ -13251,24 +14049,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit3inA
 							}
 						},
 						/* Y = 4 */
@@ -13276,24 +14074,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit4inA
 							}
 						},
 						/* Y = 5 */
@@ -13301,24 +14099,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit5inA
 							}
 						},
 						/* Y = 6 */
@@ -13326,24 +14124,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit6inA
 							}
 						},
 						/* Y = 7 */
@@ -13351,24 +14149,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operRes_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operRes_Bit7inA
 							}
 						}
 					}
@@ -13382,24 +14180,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inB
 							}
 						},
 						/* Y = 1 */
@@ -13407,24 +14205,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inB
 							}
 						},
 						/* Y = 2 */
@@ -13432,24 +14230,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inB
 							}
 						},
 						/* Y = 3 */
@@ -13457,24 +14255,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inB
 							}
 						},
 						/* Y = 4 */
@@ -13482,24 +14280,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inB
 							}
 						},
 						/* Y = 5 */
@@ -13507,24 +14305,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inB
 							}
 						},
 						/* Y = 6 */
@@ -13532,24 +14330,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inB
 							}
 						},
 						/* Y = 7 */
@@ -13557,24 +14355,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inB
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inB,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inB
 							}
 						}
 					},
@@ -13585,24 +14383,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inC
 							}
 						},
 						/* Y = 1 */
@@ -13610,24 +14408,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inC
 							}
 						},
 						/* Y = 2 */
@@ -13635,24 +14433,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inC
 							}
 						},
 						/* Y = 3 */
@@ -13660,24 +14458,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inC
 							}
 						},
 						/* Y = 4 */
@@ -13685,24 +14483,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inC
 							}
 						},
 						/* Y = 5 */
@@ -13710,24 +14508,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inC
 							}
 						},
 						/* Y = 6 */
@@ -13735,24 +14533,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inC
 							}
 						},
 						/* Y = 7 */
@@ -13760,24 +14558,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inC,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inC
 							}
 						}
 					},
@@ -13788,24 +14586,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inD
 							}
 						},
 						/* Y = 1 */
@@ -13813,24 +14611,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inD
 							}
 						},
 						/* Y = 2 */
@@ -13838,24 +14636,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inD
 							}
 						},
 						/* Y = 3 */
@@ -13863,24 +14661,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inD
 							}
 						},
 						/* Y = 4 */
@@ -13888,24 +14686,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inD
 							}
 						},
 						/* Y = 5 */
@@ -13913,24 +14711,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inD
 							}
 						},
 						/* Y = 6 */
@@ -13938,24 +14736,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inD
 							}
 						},
 						/* Y = 7 */
@@ -13963,24 +14761,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inD
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inD,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inD
 							}
 						}
 					},
@@ -13991,24 +14789,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inE
 							}
 						},
 						/* Y = 1 */
@@ -14016,24 +14814,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inE
 							}
 						},
 						/* Y = 2 */
@@ -14041,24 +14839,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inE
 							}
 						},
 						/* Y = 3 */
@@ -14066,24 +14864,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inE
 							}
 						},
 						/* Y = 4 */
@@ -14091,24 +14889,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inE
 							}
 						},
 						/* Y = 5 */
@@ -14116,24 +14914,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inE
 							}
 						},
 						/* Y = 6 */
@@ -14141,24 +14939,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inE
 							}
 						},
 						/* Y = 7 */
@@ -14166,24 +14964,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inE
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inE,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inE
 							}
 						}
 					},
@@ -14194,24 +14992,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inH
 							}
 						},
 						/* Y = 1 */
@@ -14219,24 +15017,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inH
 							}
 						},
 						/* Y = 2 */
@@ -14244,24 +15042,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inH
 							}
 						},
 						/* Y = 3 */
@@ -14269,24 +15067,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inH
 							}
 						},
 						/* Y = 4 */
@@ -14294,24 +15092,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inH
 							}
 						},
 						/* Y = 5 */
@@ -14319,24 +15117,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inH
 							}
 						},
 						/* Y = 6 */
@@ -14344,24 +15142,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inH
 							}
 						},
 						/* Y = 7 */
@@ -14369,24 +15167,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inH
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inH,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inH
 							}
 						}
 					},
@@ -14397,24 +15195,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inL
 							}
 						},
 						/* Y = 1 */
@@ -14422,24 +15220,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inL
 							}
 						},
 						/* Y = 2 */
@@ -14447,24 +15245,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inL
 							}
 						},
 						/* Y = 3 */
@@ -14472,24 +15270,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inL
 							}
 						},
 						/* Y = 4 */
@@ -14497,24 +15295,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inL
 							}
 						},
 						/* Y = 5 */
@@ -14522,24 +15320,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inL
 							}
 						},
 						/* Y = 6 */
@@ -14547,24 +15345,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inL
 							}
 						},
 						/* Y = 7 */
@@ -14572,24 +15370,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inL
 							}
 						}
 					},
@@ -14600,24 +15398,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inPAddrHL
 							}
 						},
 						/* Y = 1 */
@@ -14625,24 +15423,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inPAddrHL
 							}
 						},
 						/* Y = 2 */
@@ -14650,24 +15448,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit2inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit2inPAddrHL
 							}
 						},
 						/* Y = 3 */
@@ -14675,24 +15473,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inPAddrHL
 							}
 						},
 						/* Y = 4 */
@@ -14700,24 +15498,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inPAddrHL
 							}
 						},
 						/* Y = 5 */
@@ -14725,24 +15523,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inPAddrHL
 							}
 						},
 						/* Y = 6 */
@@ -14750,24 +15548,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inPAddrHL
 							}
 						},
 						/* Y = 7 */
@@ -14775,24 +15573,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inPAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inPAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inPAddrHL
 							}
 						}
 					},
@@ -14803,24 +15601,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit0inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit0inA
 							}
 						},
 						/* Y = 1 */
@@ -14828,24 +15626,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inA
 							}
 						},
 						/* Y = 2 */
@@ -14853,24 +15651,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit1inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit1inA
 							}
 						},
 						/* Y = 3 */
@@ -14878,24 +15676,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit3inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit3inA
 							}
 						},
 						/* Y = 4 */
@@ -14903,24 +15701,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit4inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit4inA
 							}
 						},
 						/* Y = 5 */
@@ -14928,24 +15726,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit5inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit5inA
 							}
 						},
 						/* Y = 6 */
@@ -14953,24 +15751,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit6inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit6inA
 							}
 						},
 						/* Y = 7 */
@@ -14978,24 +15776,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 1 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 2 */
-								&OperNop,
+								&operSet_Bit7inA,
 								/* P = 3 */
-								&OperNop
+								&operSet_Bit7inA
 							}
 						}
 					}
