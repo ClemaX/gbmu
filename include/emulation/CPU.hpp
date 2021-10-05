@@ -69,7 +69,7 @@ namespace GBMU_NAMESPACE {
 		int8_t			getPrefixFamily() const { return this->prefixFamily; }
 
 		// TODO: Wait a minute ... This return true in all the cases !!!
-		bool			isValid()
+		bool			isValid() const
 		{
 			return (
 				   this->getX() < OPCODE_X_SZMAX
@@ -474,6 +474,9 @@ namespace GBMU_NAMESPACE {
 		static void OperNop(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operInlNop(core, c); }
 
+		/////////////////////////////
+		// 16 BIT LOADS OPERATIONS //
+		/////////////////////////////
 
 //
 ///TODO: No y, find the exact spot to place them with opcode value
@@ -506,7 +509,9 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: ? ( LD A, (nn) )
 
-
+		/////////////////////////////////////
+		// 16 BIT INC/DEC (ALU) OPERATIONS //
+		/////////////////////////////////////
 
 //
 ///TODO: No y, find the exact spot to place them with opcode value
@@ -552,8 +557,9 @@ namespace GBMU_NAMESPACE {
 		{ operBaseDec<0X8>(core.regs.af, c); }
 
 
-
-
+		////////////////////////////////////
+		// 8 BIT INC/DEC (ALU) OPERATIONS //
+		////////////////////////////////////
 //
 ///TODO: All p & q have been set, find which one set to operNop
 ///TODO: may need std::forward to pass c as move (or maybe i can't pass it as move value)
@@ -717,10 +723,14 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: ? ( SCF )
 		/// Opcode: ? ( CCF )
 
+		////////////////////////////
+		// 8 BIT LOADS OPERATIONS //
+		////////////////////////////
 
 //
 ///TODO: All p & q have been set, find which one set to operNop
 //
+
 		/// Opcode: 0X40, cycles: 4 ( LD B, B )
 		static void
 		operLD_BinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
@@ -1039,75 +1049,617 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0X7F, cycles: 4 ( LD A, A )
 		static void
 		operLD_AinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ OperNop(core, c); }
+		{ operInlNop(core, c); }
 
-		///TODO: Implement those using 'already done' base inlined functions
-		///TODO: Do not forget to handle flags !
+		//////////////////////////
+		// 8 BIT ALU OPERATIONS //
+		//////////////////////////
+
+//
+///TODO: All p & q have been set, find which one set to operNop
+//
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperAdd(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Set if carry from bit 3.
+  				C - Set if carry from bit 7.
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperSub(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero.
+   				N - Reset.
+   				H - Set if carry from bit 4.
+   				C - Set if carry from bit 7.
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperAnd(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Set.
+  				C - Reset
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperXor(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Reset.
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperOr(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Reset.
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
+
+		template <typename Flags, typename T>
+		static inline void
+		handleFlagsOperCp(Flags& flags, T value)
+		{
+			/** TODO: Flags affected:
+			 	Z - Set if result is zero. (Set if A = n.)
+  				N - Set.
+  				H - Set if no borrow from bit 4.
+  				C - Set for no borrow. (Set if A < n.)
+			*/
+
+			static_cast<void>(flags);
+			static_cast<void>(value);
+		}
 
 		/// Opcode: 0X80, cycles: 4 ( ADD A, B )
+		static void
+		operAdd_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X88, cycles: 4 ( ADC A, B )
+		static void
+		operAddCarry_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X90, cycles: 4 ( SUB B )
+		static void
+		operSub_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X98, cycles: 4 ( SBC A, B )
+		static void
+		operSubCarry_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA0, cycles: 4 ( AND B )
+		static void
+		operAnd_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA8, cycles: 4 ( XOR B )
+		static void
+		operXor_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB0, cycles: 4 ( OR B )
+		static void
+		operOr_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB8, cycles: 4 ( CP B )
+		static void
+		operCp_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X81, cycles: 4 ( ADD A, C )
+		static void
+		operAdd_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X89, cycles: 4 ( ADC A, C )
+		static void
+		operAddCarry_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X91, cycles: 4 ( SUB C )
+		static void
+		operSub_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X99, cycles: 4 ( SBC A, C )
+		static void
+		operSubCarry_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA1, cycles: 4 ( AND C )
+		static void
+		operAnd_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA9, cycles: 4 ( XOR C )
+		static void
+		operXor_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB1, cycles: 4 ( OR C )
+		static void
+		operOr_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB9, cycles: 4 ( CP C )
+		static void
+		operCp_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X82, cycles: 4 ( ADD A, D )
+		static void
+		operAdd_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8A, cycles: 4 ( ADC A, D )
+		static void
+		operAddCarry_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.dewords.d, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X92, cycles: 4 ( SUB D )
+		static void
+		operSub_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9A, cycles: 4 ( SBC A, D )
+		static void
+		operSubCarry_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.dewords.d, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA2, cycles: 4 ( AND D )
+		static void
+		operAnd_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAA, cycles: 4 ( XOR D )
+		static void
+		operXor_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB2, cycles: 4 ( OR D )
+		static void
+		operOr_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBA, cycles: 4 ( CP D )
+		static void
+		operCp_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X83, cycles: 4 ( ADD A, E )
+		static void
+		operAdd_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8B, cycles: 4 ( ADC A, E )
+		static void
+		operAddCarry_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.dewords.e, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X93, cycles: 4 ( SUB E )
+		static void
+		operSub_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9B, cycles: 4 ( SBC A, E )
+		static void
+		operSubCarry_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.dewords.e, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA3, cycles: 4 ( AND E )
+		static void
+		operAnd_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAB, cycles: 4 ( XOR E )
+		static void
+		operXor_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB3, cycles: 4 ( OR E )
+		static void
+		operOr_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBB, cycles: 4 ( CP E )
+		static void
+		operCp_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X84, cycles: 4 ( ADD A, H )
+		static void
+		operAdd_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8C, cycles: 4 ( ADC A, H )
+		static void
+		operAddCarry_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X94, cycles: 4 ( SUB H )
+		static void
+		operSub_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9C, cycles: 4 ( SBC A, H )
+		static void
+		operSubCarry_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA4, cycles: 4 ( AND H )
+		static void
+		operAnd_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAC, cycles: 4 ( XOR H )
+		static void
+		operXor_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB4, cycles: 4 ( OR H )
+		static void
+		operOr_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBC, cycles: 4 ( CP H )
+		static void
+		operCp_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X85, cycles: 4 ( ADD A, L )
+		static void
+		operAdd_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8D, cycles: 4 ( ADC A, L )
+		static void
+		operAddCarry_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X95, cycles: 4 ( SUB L )
+		static void
+		operSub_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9D, cycles: 4 ( SBC A, L )
+		static void
+		operSubCarry_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA5, cycles: 4 ( AND L )
+		static void
+		operAnd_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAD, cycles: 4 ( XOR L )
+		static void
+		operXor_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB5, cycles: 4 ( OR L )
+		static void
+		operOr_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBD, cycles: 4 ( CP L )
+		static void
+		operCp_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X86, cycles: 4 ( ADD A, (HL) )
+		static void
+		operAdd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8E, cycles: 4 ( ADC A, (HL) )
+		static void
+		operAddCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X96, cycles: 4 ( SUB (HL) )
+		static void
+		operSub_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9E, cycles: 8 ( SBC A, (HL) )
+		static void
+		operSubCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA6, cycles: 8( AND (HL) )
+		static void
+		operAnd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAE, cycles: 8 ( XOR (HL) )
+		static void
+		operXor_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB6, cycles: 8 ( OR (HL) )
+		static void
+		operOr_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBE, cycles: 8 ( CP (HL) )
+		static void
+		operCp_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X87, cycles: 4 ( ADD A, A )
+		static void
+		operAdd_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X8F, cycles: 4 ( ADC A, A )
+		static void
+		operAddCarry_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.afwords.a, c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X97, cycles: 4 ( SUB A )
+		static void
+		operSub_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0X9F, cycles: 4 ( SBC A, A )
+		static void
+		operSubCarry_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.afwords.a, c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XA7, cycles: 4 ( AND A )
+		static void
+		operAnd_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XAF, cycles: 4 ( XOR A )
+		static void
+		operXor_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XB7, cycles: 4 ( OR A )
+		static void
+		operOr_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
 		/// Opcode: 0XBF, cycles: 4 ( CP A )
+		static void
+		operCp_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
 
 		///////////////////////////////////////////////////////
 		// All operations are indexed & statically preloaded //
@@ -3922,7 +4474,7 @@ namespace GBMU_NAMESPACE {
 							{
 								/* P = 0 */
 								&operLD_LinPAddrHL,
-								/* P = 1 */
+								/* P core.regs.bcwords.b= 1 */
 								&operLD_LinPAddrHL,
 								/* P = 2 */
 								&operLD_LinPAddrHL,
@@ -4383,24 +4935,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_BtoA
 							}
 						},
 						/* Y = 1 */
@@ -4408,24 +4960,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_BtoA
 							}
 						},
 						/* Y = 2 */
@@ -4433,24 +4985,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_BtoA
 							}
 						},
 						/* Y = 3 */
@@ -4458,24 +5010,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_BtoA
 							}
 						},
 						/* Y = 4 */
@@ -4483,24 +5035,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_BtoA
 							}
 						},
 						/* Y = 5 */
@@ -4508,24 +5060,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_BtoA
 							}
 						},
 						/* Y = 6 */
@@ -4533,24 +5085,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_BtoA
 							}
 						},
 						/* Y = 7 */
@@ -4558,24 +5110,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_BtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_BtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_BtoA
 							}
 						}
 					},
@@ -4586,24 +5138,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_CtoA
 							}
 						},
 						/* Y = 1 */
@@ -4611,24 +5163,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_CtoA
 							}
 						},
 						/* Y = 2 */
@@ -4636,24 +5188,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_CtoA
 							}
 						},
 						/* Y = 3 */
@@ -4661,24 +5213,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_CtoA
 							}
 						},
 						/* Y = 4 */
@@ -4686,24 +5238,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_CtoA
 							}
 						},
 						/* Y = 5 */
@@ -4711,24 +5263,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_CtoA
 							}
 						},
 						/* Y = 6 */
@@ -4736,24 +5288,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_CtoA
 							}
 						},
 						/* Y = 7 */
@@ -4761,24 +5313,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_CtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_CtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_CtoA
 							}
 						}
 					},
@@ -4789,24 +5341,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_DtoA
 							}
 						},
 						/* Y = 1 */
@@ -4814,24 +5366,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_DtoA
 							}
 						},
 						/* Y = 2 */
@@ -4839,24 +5391,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_DtoA
 							}
 						},
 						/* Y = 3 */
@@ -4864,24 +5416,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_DtoA
 							}
 						},
 						/* Y = 4 */
@@ -4889,24 +5441,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_DtoA
 							}
 						},
 						/* Y = 5 */
@@ -4914,24 +5466,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_DtoA
 							}
 						},
 						/* Y = 6 */
@@ -4939,24 +5491,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_DtoA
 							}
 						},
 						/* Y = 7 */
@@ -4964,24 +5516,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_DtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_DtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_DtoA
 							}
 						}
 					},
@@ -4992,24 +5544,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_EtoA
 							}
 						},
 						/* Y = 1 */
@@ -5017,24 +5569,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_EtoA
 							}
 						},
 						/* Y = 2 */
@@ -5042,24 +5594,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_EtoA
 							}
 						},
 						/* Y = 3 */
@@ -5067,24 +5619,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_EtoA
 							}
 						},
 						/* Y = 4 */
@@ -5092,24 +5644,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_EtoA
 							}
 						},
 						/* Y = 5 */
@@ -5117,24 +5669,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_EtoA
 							}
 						},
 						/* Y = 6 */
@@ -5142,24 +5694,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_EtoA
 							}
 						},
 						/* Y = 7 */
@@ -5167,24 +5719,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_EtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_EtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_EtoA
 							}
 						}
 					},
@@ -5195,24 +5747,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_HtoA
 							}
 						},
 						/* Y = 1 */
@@ -5220,24 +5772,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_HtoA
 							}
 						},
 						/* Y = 2 */
@@ -5245,24 +5797,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_HtoA
 							}
 						},
 						/* Y = 3 */
@@ -5270,24 +5822,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_HtoA
 							}
 						},
 						/* Y = 4 */
@@ -5295,24 +5847,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_HtoA
 							}
 						},
 						/* Y = 5 */
@@ -5320,24 +5872,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_HtoA
 							}
 						},
 						/* Y = 6 */
@@ -5345,24 +5897,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_HtoA
 							}
 						},
 						/* Y = 7 */
@@ -5370,24 +5922,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_HtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_HtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_HtoA
 							}
 						}
 					},
@@ -5398,24 +5950,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_LtoA
 							}
 						},
 						/* Y = 1 */
@@ -5423,24 +5975,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_LtoA
 							}
 						},
 						/* Y = 2 */
@@ -5448,24 +6000,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_LtoA
 							}
 						},
 						/* Y = 3 */
@@ -5473,24 +6025,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_LtoA
 							}
 						},
 						/* Y = 4 */
@@ -5498,24 +6050,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_LtoA
 							}
 						},
 						/* Y = 5 */
@@ -5523,24 +6075,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_LtoA
 							}
 						},
 						/* Y = 6 */
@@ -5548,24 +6100,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_LtoA
 							}
 						},
 						/* Y = 7 */
@@ -5573,24 +6125,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_LtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_LtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_LtoA
 							}
 						}
 					},
@@ -5601,24 +6153,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_PAddrHLtoA
 							}
 						},
 						/* Y = 1 */
@@ -5626,24 +6178,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_PAddrHLtoA
 							}
 						},
 						/* Y = 2 */
@@ -5651,24 +6203,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_PAddrHLtoA
 							}
 						},
 						/* Y = 3 */
@@ -5676,24 +6228,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_PAddrHLtoA
 							}
 						},
 						/* Y = 4 */
@@ -5701,24 +6253,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_PAddrHLtoA
 							}
 						},
 						/* Y = 5 */
@@ -5726,24 +6278,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_PAddrHLtoA
 							}
 						},
 						/* Y = 6 */
@@ -5751,24 +6303,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_PAddrHLtoA
 							}
 						},
 						/* Y = 7 */
@@ -5776,24 +6328,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_PAddrHLtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_PAddrHLtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_PAddrHLtoA
 							}
 						}
 					},
@@ -5804,24 +6356,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_AtoA
 							}
 						},
 						/* Y = 1 */
@@ -5829,24 +6381,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_AtoA
 							}
 						},
 						/* Y = 2 */
@@ -5854,24 +6406,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operSub_AtoA
 							}
 						},
 						/* Y = 3 */
@@ -5879,24 +6431,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_AtoA
 							}
 						},
 						/* Y = 4 */
@@ -5904,24 +6456,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_AtoA
 							}
 						},
 						/* Y = 5 */
@@ -5929,24 +6481,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operXor_AtoA
 							}
 						},
 						/* Y = 6 */
@@ -5954,24 +6506,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operOr_AtoA
 							}
 						},
 						/* Y = 7 */
@@ -5979,24 +6531,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_AtoA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_AtoA,
 								/* P = 3 */
-								&OperNop
+								&operCp_AtoA
 							}
 						}
 					}
@@ -46481,7 +47033,7 @@ namespace GBMU_NAMESPACE {
 		struct ExceptionInvalidOpcode : std::exception
 		{ const char* what() const noexcept { return "invalid opcode: out of bounds"; } };
 
-		void executeOperation(Opcode opcode)
+		void executeOperation(const Opcode& opcode)
 		// may throw ExceptionInvalidOpcode
 		{
 			Chrono c;
