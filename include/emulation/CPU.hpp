@@ -41,6 +41,11 @@
 # define FGMASK_DEL(target, mask) ((target) &= ~(mask))
 # define FGMASK_HAS(target, mask) ((target) & (mask))
 
+# define Z80WORD_ROTLEFT(target, amount) (((target) << (amount)) | ((target) >> (8 - (amount))))
+# define Z80DWORD_ROTLEFT(target, amount) (((target) << (amount)) | ((target) >> (16 - (amount))))
+# define Z80WORD_ROTRIGHT(target, amount) (((target) >> (amount)) | ((target) << (8 - (amount))))
+# define Z80DWORD_ROTRIGHT(target, amount) (((target) >> (amount)) | ((target) << (16 - (amount))))
+
 namespace GBMU_NAMESPACE {
 
     class Opcode
@@ -516,6 +521,115 @@ namespace GBMU_NAMESPACE {
 			// Set H flag
 			c.setCycles(cycles);
 		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRotateLelf(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 7 data.
+			*/
+			static_cast<void>(flags);
+
+			dest = Z80WORD_ROTLEFT(dest, 1);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRotateLelfCarry(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 7 data.
+			*/
+			static_cast<void>(flags);
+
+			dest = Z80WORD_ROTLEFT(dest, 1);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRotateRightCarry(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 0 data.
+			*/
+			static_cast<void>(flags);
+
+			dest = Z80WORD_ROTRIGHT(dest, 1);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRotateRight(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 0 data.
+			*/
+			static_cast<void>(flags);
+
+			dest = Z80WORD_ROTRIGHT(dest, 1);
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseShiftLeft(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 7 data.
+			*/
+			static_cast<void>(flags);
+
+			dest <<= 1;
+			c.setCycles(cycles);
+		}
+
+		template <typename T, typename Flags, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseShiftRight(T& dest, Flags flags, Chrono& c)
+		noexcept
+		{
+			/** TODO:
+			 	Z - Set if result is zero.
+  				N - Reset.
+  				H - Reset.
+  				C - Contains old bit 0 data.
+			*/
+			static_cast<void>(flags);
+
+			dest >>= 1;
+			c.setCycles(cycles);
+		}
+		///TODO: functions calling this can set MSB to 0 or not change its value.
 
 		//////////////////////////////////
 		// Operations function pointers //
@@ -1716,400 +1830,649 @@ namespace GBMU_NAMESPACE {
 		// ROTATES & SHIFTS OPEREATIONS //
 		//////////////////////////////////
 //
-///TODO: Document SLL
+///TODO: Document SLL & implement
+///TODO: Add MSB to SRL, SLL
 //
-		// Opcode: 0XCB00, cycles: 8 ( RCL B )
-		// Opcode: 0XCB08, cycles: 8 ( RRC B )
-		// Opcode: 0XCB10, cycles: 8 ( RL B )
-		// Opcode: 0XCB18, cycles: 8 ( RR B )
-		// Opcode: 0XCB20, cycles: 8 ( SLA B )
-		// Opcode: 0XCB28, cycles: 8 ( SRA B )
-		// Opcode: ?, cycles: 8 ( SLL B )
-		// Opcode: 0XCB38, cycles: 8 ( SRL B )
-		// Opcode: 0XCB01, cycles: 8 ( RCL C )
-		// Opcode: 0XCB09, cycles: 8 ( RRC C )
-		// Opcode: 0XCB11, cycles: 8 ( RL C )
-		// Opcode: 0XCB19, cycles: 8 ( RR C )
-		// Opcode: 0XCB21, cycles: 8 ( SLA C )
-		// Opcode: 0XCB29, cycles: 8 ( SRA C )
-		// Opcode: ?, cycles: 8 ( SLL C )
-		// Opcode: 0XCB39, cycles: 8 ( SRL C )
-		// Opcode: 0XCB02, cycles: 8 ( RCL D )
-		// Opcode: 0XCB0A, cycles: 8 ( RRC D )
-		// Opcode: 0XCB12, cycles: 8 ( RL D )
-		// Opcode: 0XCB1A, cycles: 8 ( RR D )
-		// Opcode: 0XCB22, cycles: 8 ( SLA D )
-		// Opcode: 0XCB2A, cycles: 8 ( SRA D )
-		// Opcode: ?, cycles: 8 ( SLL D )
-		// Opcode: 0XCB3A, cycles: 8 ( SRL D )
-		// Opcode: 0XCB03, cycles: 8 ( RCL E )
-		// Opcode: 0XCB0B, cycles: 8 ( RRC E )
-		// Opcode: 0XCB13, cycles: 8 ( RL E )
-		// Opcode: 0XCB1B, cycles: 8 ( RR E )
-		// Opcode: 0XCB23, cycles: 8 ( SLA E )
-		// Opcode: 0XCB2B, cycles: 8 ( SRA E )
-		// Opcode: ?, cycles: 8 ( SLL E )
-		// Opcode: 0XCB3B, cycles: 8 ( SRL E )
-		// Opcode: 0XCB04, cycles: 8 ( RCL H )
-		// Opcode: 0XCB0C, cycles: 8 ( RRC H )
-		// Opcode: 0XCB14, cycles: 8 ( RL H )
-		// Opcode: 0XCB1C, cycles: 8 ( RR H )
-		// Opcode: 0XCB24, cycles: 8 ( SLA H )
-		// Opcode: 0XCB2C, cycles: 8 ( SRA H )
-		// Opcode: ?, cycles: 8 ( SLL H )
-		// Opcode: 0XCB3C, cycles: 8 ( SRL H )
-		// Opcode: 0XCB05, cycles: 8 ( RCL L )
-		// Opcode: 0XCB0D, cycles: 8 ( RRC L )
-		// Opcode: 0XCB15, cycles: 8 ( RL L )
-		// Opcode: 0XCB1D, cycles: 8 ( RR L )
-		// Opcode: 0XCB25, cycles: 8 ( SLA L )
-		// Opcode: 0XCB2D, cycles: 8 ( SRA L )
-		// Opcode: ?, cycles: 8 ( SLL L )
-		// Opcode: 0XCB3D, cycles: 8 ( SRL L )
-		// Opcode: 0XCB06, cycles: 16 ( RCL (HL) )
-		// Opcode: 0XCB0E, cycles: 16 ( RRC (HL) )
-		// Opcode: 0XCB16, cycles: 16 ( RL (HL) )
-		// Opcode: 0XCB1E, cycles: 16 ( RR (HL) )
-		// Opcode: 0XCB26, cycles: 16 ( SLA (HL) )
-		// Opcode: 0XCB2E, cycles: 16 ( SRA (HL) )
-		// Opcode: ?, cycles: 16 ( SLL (HL) )
-		// Opcode: 0XCB3E, cycles: 16 ( SRL (HL) )
-		// Opcode: 0XCB07, cycles: 8 ( RCL A )
-		// Opcode: 0XCB0F, cycles: 8 ( RRC A )
-		// Opcode: 0XCB17, cycles: 8 ( RL A )
-		// Opcode: 0XCB1F, cycles: 8 ( RR A )
-		// Opcode: 0XCB27, cycles: 8 ( SLA A )
-		// Opcode: 0XCB2F, cycles: 8 ( SRA A )
-		// Opcode: ?, cycles: 8 ( SLL A )
-		// Opcode: 0XCB3F, cycles: 8 ( SRL A )
+		/// Opcode: 0XCB00, cycles: 8 ( RLC B )
+		static void
+		operRLC_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: 0XCB08, cycles: 8 ( RRC B )
+		static void
+		operRRC_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: 0XCB10, cycles: 8 ( RL B )
+		static void
+		operRL_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: 0XCB18, cycles: 8 ( RR B )
+		static void
+		operRR_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: 0XCB20, cycles: 8 ( SLA B )
+		static void
+		operSLA_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: 0XCB28, cycles: 8 ( SRA B )
+		static void
+		operSRA_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.bcwords.b, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL B )
+
+		/// Opcode: 0XCB38, cycles: 8 ( SRL B )
+		static void
+		operSRL_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.bcwords.b, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB01, cycles: 8 ( RLC C )
+		static void
+		operRLC_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: 0XCB09, cycles: 8 ( RRC C )
+		static void
+		operRRC_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: 0XCB11, cycles: 8 ( RL C )
+		static void
+		operRL_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: 0XCB19, cycles: 8 ( RR C )
+		static void
+		operRR_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: 0XCB21, cycles: 8 ( SLA C )
+		static void
+		operSLA_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: 0XCB29, cycles: 8 ( SRA C )
+		static void
+		operSRA_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.bcwords.c, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL C )
+
+		/// Opcode: 0XCB39, cycles: 8 ( SRL C )
+		static void
+		operSRL_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.bcwords.c, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB02, cycles: 8 ( RLC D )
+		static void
+		operRLC_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: 0XCB0A, cycles: 8 ( RRC D )
+		static void
+		operRRC_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: 0XCB12, cycles: 8 ( RL D )
+		static void
+		operRL_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: 0XCB1A, cycles: 8 ( RR D )
+		static void
+		operRR_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: 0XCB22, cycles: 8 ( SLA D )
+		static void
+		operSLA_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: 0XCB2A, cycles: 8 ( SRA D )
+		static void
+		operSRA_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.dewords.d, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL D )
+
+		/// Opcode: 0XCB3A, cycles: 8 ( SRL D )
+		static void
+		operSRL_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.dewords.d, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB03, cycles: 8 ( RLC E )
+		static void
+		operRLC_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: 0XCB0B, cycles: 8 ( RRC E )
+		static void
+		operRRC_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: 0XCB13, cycles: 8 ( RL E )
+		static void
+		operRL_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: 0XCB1B, cycles: 8 ( RR E )
+		static void
+		operRR_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: 0XCB23, cycles: 8 ( SLA E )
+		static void
+		operSLA_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: 0XCB2B, cycles: 8 ( SRA E )
+		static void
+		operSRA_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.dewords.e, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL E )
+
+		/// Opcode: 0XCB3B, cycles: 8 ( SRL E )
+		static void
+		operSRL_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.dewords.e, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB04, cycles: 8 ( RLC H )
+		static void
+		operRLC_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: 0XCB0C, cycles: 8 ( RRC H )
+		static void
+		operRRC_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: 0XCB14, cycles: 8 ( RL H )
+		static void
+		operRL_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: 0XCB1C, cycles: 8 ( RR H )
+		static void
+		operRR_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: 0XCB24, cycles: 8 ( SLA H )
+		static void
+		operSLA_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: 0XCB2C, cycles: 8 ( SRA H )
+		static void
+		operSRA_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.hlwords.h, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL H )
+
+		/// Opcode: 0XCB3C, cycles: 8 ( SRL H )
+		static void
+		operSRL_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.hlwords.h, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB05, cycles: 8 ( RLC L )
+		static void
+		operRLC_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: 0XCB0D, cycles: 8 ( RRC L )
+		static void
+		operRRC_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: 0XCB15, cycles: 8 ( RL L )
+		static void
+		operRL_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: 0XCB1D, cycles: 8 ( RR L )
+		static void
+		operRR_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: 0XCB25, cycles: 8 ( SLA L )
+		static void
+		operSLA_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: 0XCB2D, cycles: 8 ( SRA L )
+		static void
+		operSRA_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.hlwords.l, core.flags, c); }
+
+		/// Opcode: ?, cycles: 8 ( SLL L )
+
+		/// Opcode: 0XCB3D, cycles: 8 ( SRL L )
+		static void
+		operSRL_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.hlwords.l, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB06, cycles: 16 ( RLC (HL) )
+		static void
+		operRLC_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: 0XCB0E, cycles: 16 ( RRC (HL) )
+		static void
+		operRRC_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: 0XCB16, cycles: 16 ( RL (HL) )
+		static void
+		operRL_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: 0XCB1E, cycles: 16 ( RR (HL) )
+		static void
+		operRR_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: 0XCB26, cycles: 16 ( SLA (HL) )
+		static void
+		operSLA_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: 0XCB2E, cycles: 16 ( SRA (HL) )
+		static void
+		operSRA_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+
+		/// Opcode: ?, cycles: 16 ( SLL (HL) )
+
+		/// Opcode: 0XCB3E, cycles: 16 ( SRL (HL) )
+		static void
+		operSRL_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+			///TODO: set MSB to 0
+		}
+
+		/// Opcode: 0XCB07, cycles: 8 ( RLC A )
+		static void
+		operRLC_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelfCarry<0X8>(core.regs.afwords.a, core.flags, c); }
 
 
+		/// Opcode: 0XCB0F, cycles: 8 ( RRC A )
+		static void
+		operRRC_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRightCarry<0X8>(core.regs.afwords.a, core.flags, c); }
 
+		/// Opcode: 0XCB17, cycles: 8 ( RL A )
+		static void
+		operRL_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateLelf<0X8>(core.regs.afwords.a, core.flags, c); }
 
+		/// Opcode: 0XCB1F, cycles: 8 ( RR A )
+		static void
+		operRR_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseRotateRight<0X8>(core.regs.afwords.a, core.flags, c); }
 
+		/// Opcode: 0XCB27, cycles: 8 ( SLA A )
+		static void
+		operSLA_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftLeft<0X8>(core.regs.afwords.a, core.flags, c); }
 
+		/// Opcode: 0XCB2F, cycles: 8 ( SRA A )
+		static void
+		operSRA_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{ operBaseShiftRight<0X8>(core.regs.afwords.a, core.flags, c); }
 
+		/// Opcode: ?, cycles: 8 ( SLL A )
 
+		/// Opcode: 0XCB3F, cycles: 8 ( SRL A )
+		static void
+		operSRL_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		{
+			operBaseShiftLeft<0X8>(core.regs.afwords.a, core.flags, c);
+			///TODO: set MSB to 0
+		}
 
 //
 ///TODO: All p & q have been set, find which one set to operNop
 //
-		// Opcode: 0XCB40, cycles: 8 ( BIT 0, B )
+		/// Opcode: 0XCB40, cycles: 8 ( BIT 0, B )
 		static void
 		operBit_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB48, cycles: 8 ( BIT 1, B )
+		/// Opcode: 0XCB48, cycles: 8 ( BIT 1, B )
 		static void
 		operBit_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB50, cycles: 8 ( BIT 2, B )
+		/// Opcode: 0XCB50, cycles: 8 ( BIT 2, B )
 		static void
 		operBit_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB58, cycles: 8 ( BIT 3, B )
+		/// Opcode: 0XCB58, cycles: 8 ( BIT 3, B )
 		static void
 		operBit_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB60, cycles: 8 ( BIT 4, B )
+		/// Opcode: 0XCB60, cycles: 8 ( BIT 4, B )
 		static void
 		operBit_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB68, cycles: 8 ( BIT 5, B )
+		/// Opcode: 0XCB68, cycles: 8 ( BIT 5, B )
 		static void
 		operBit_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB70, cycles: 8 ( BIT 6, B )
+		/// Opcode: 0XCB70, cycles: 8 ( BIT 6, B )
 		static void
 		operBit_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB78, cycles: 8 ( BIT 7, B )
+		/// Opcode: 0XCB78, cycles: 8 ( BIT 7, B )
 		static void
 		operBit_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB41, cycles: 8 ( BIT 0, C )
+		/// Opcode: 0XCB41, cycles: 8 ( BIT 0, C )
 		static void
 		operBit_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB49, cycles: 8 ( BIT 1, C )
+		/// Opcode: 0XCB49, cycles: 8 ( BIT 1, C )
 		static void
 		operBit_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB51, cycles: 8 ( BIT 2, C )
+		/// Opcode: 0XCB51, cycles: 8 ( BIT 2, C )
 		static void
 		operBit_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB59, cycles: 8 ( BIT 3, C )
+		/// Opcode: 0XCB59, cycles: 8 ( BIT 3, C )
 		static void
 		operBit_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB61, cycles: 8 ( BIT 4, C )
+		/// Opcode: 0XCB61, cycles: 8 ( BIT 4, C )
 		static void
 		operBit_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB69, cycles: 8 ( BIT 5, C )
+		/// Opcode: 0XCB69, cycles: 8 ( BIT 5, C )
 		static void
 		operBit_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB71, cycles: 8 ( BIT 6, C )
+		/// Opcode: 0XCB71, cycles: 8 ( BIT 6, C )
 		static void
 		operBit_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB79, cycles: 8 ( BIT 7, C )
+		/// Opcode: 0XCB79, cycles: 8 ( BIT 7, C )
 		static void
 		operBit_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB42, cycles: 8 ( BIT 0, D )
+		/// Opcode: 0XCB42, cycles: 8 ( BIT 0, D )
 		static void
 		operBit_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4A, cycles: 8 ( BIT 1, D )
+		/// Opcode: 0XCB4A, cycles: 8 ( BIT 1, D )
 		static void
 		operBit_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB52, cycles: 8 ( BIT 2, D )
+		/// Opcode: 0XCB52, cycles: 8 ( BIT 2, D )
 		static void
 		operBit_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5A, cycles: 8 ( BIT 3, D )
+		/// Opcode: 0XCB5A, cycles: 8 ( BIT 3, D )
 		static void
 		operBit_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB62, cycles: 8 ( BIT 4, D )
+		/// Opcode: 0XCB62, cycles: 8 ( BIT 4, D )
 		static void
 		operBit_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6A, cycles: 8 ( BIT 5, D )
+		/// Opcode: 0XCB6A, cycles: 8 ( BIT 5, D )
 		static void
 		operBit_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB72, cycles: 8 ( BIT 6, D )
+		/// Opcode: 0XCB72, cycles: 8 ( BIT 6, D )
 		static void
 		operBit_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7A, cycles: 8 ( BIT 7, D )
+		/// Opcode: 0XCB7A, cycles: 8 ( BIT 7, D )
 		static void
 		operBit_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB43, cycles: 8 ( BIT 0, E )
+		/// Opcode: 0XCB43, cycles: 8 ( BIT 0, E )
 		static void
 		operBit_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4B, cycles: 8 ( BIT 1, E )
+		/// Opcode: 0XCB4B, cycles: 8 ( BIT 1, E )
 		static void
 		operBit_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB53, cycles: 8 ( BIT 2, E )
+		/// Opcode: 0XCB53, cycles: 8 ( BIT 2, E )
 		static void
 		operBit_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5B, cycles: 8 ( BIT 3, E )
+		/// Opcode: 0XCB5B, cycles: 8 ( BIT 3, E )
 		static void
 		operBit_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB63, cycles: 8 ( BIT 4, E )
+		/// Opcode: 0XCB63, cycles: 8 ( BIT 4, E )
 		static void
 		operBit_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6B, cycles: 8 ( BIT 5, E )
+		/// Opcode: 0XCB6B, cycles: 8 ( BIT 5, E )
 		static void
 		operBit_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB73, cycles: 8 ( BIT 6, E )
+		/// Opcode: 0XCB73, cycles: 8 ( BIT 6, E )
 		static void
 		operBit_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7B, cycles: 8 ( BIT 7, E )
+		/// Opcode: 0XCB7B, cycles: 8 ( BIT 7, E )
 		static void
 		operBit_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB44, cycles: 8 ( BIT 0, H )
+		/// Opcode: 0XCB44, cycles: 8 ( BIT 0, H )
 		static void
 		operBit_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4C, cycles: 8 ( BIT 1, H )
+		/// Opcode: 0XCB4C, cycles: 8 ( BIT 1, H )
 		static void
 		operBit_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB54, cycles: 8 ( BIT 2, H )
+		/// Opcode: 0XCB54, cycles: 8 ( BIT 2, H )
 		static void
 		operBit_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5C, cycles: 8 ( BIT 3, H )
+		/// Opcode: 0XCB5C, cycles: 8 ( BIT 3, H )
 		static void
 		operBit_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB64, cycles: 8 ( BIT 4, H )
+		/// Opcode: 0XCB64, cycles: 8 ( BIT 4, H )
 		static void
 		operBit_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6C, cycles: 8 ( BIT 5, H )
+		/// Opcode: 0XCB6C, cycles: 8 ( BIT 5, H )
 		static void
 		operBit_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB74, cycles: 8 ( BIT 6, H )
+		/// Opcode: 0XCB74, cycles: 8 ( BIT 6, H )
 		static void
 		operBit_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7C, cycles: 8 ( BIT 7, H )
+		/// Opcode: 0XCB7C, cycles: 8 ( BIT 7, H )
 		static void
 		operBit_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB45, cycles: 8 ( BIT 0, L )
+		/// Opcode: 0XCB45, cycles: 8 ( BIT 0, L )
 		static void
 		operBit_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4D, cycles: 8 ( BIT 1, L )
+		/// Opcode: 0XCB4D, cycles: 8 ( BIT 1, L )
 		static void
 		operBit_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB55, cycles: 8 ( BIT 2, L )
+		/// Opcode: 0XCB55, cycles: 8 ( BIT 2, L )
 		static void
 		operBit_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5D, cycles: 8 ( BIT 3, L )
+		/// Opcode: 0XCB5D, cycles: 8 ( BIT 3, L )
 		static void
 		operBit_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB65, cycles: 8 ( BIT 4, L )
+		/// Opcode: 0XCB65, cycles: 8 ( BIT 4, L )
 		static void
 		operBit_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6D, cycles: 8 ( BIT 5, L )
+		/// Opcode: 0XCB6D, cycles: 8 ( BIT 5, L )
 		static void
 		operBit_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB75, cycles: 8 ( BIT 6, L )
+		/// Opcode: 0XCB75, cycles: 8 ( BIT 6, L )
 		static void
 		operBit_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7D, cycles: 8 ( BIT 7, L )
+		/// Opcode: 0XCB7D, cycles: 8 ( BIT 7, L )
 		static void
 		operBit_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB46, cycles: 16 ( BIT 0, (HL) )
+		/// Opcode: 0XCB46, cycles: 16 ( BIT 0, (HL) )
 		static void
 		operBit_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4E, cycles: 16 ( BIT 1, (HL) )
+		/// Opcode: 0XCB4E, cycles: 16 ( BIT 1, (HL) )
 		static void
 		operBit_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB56, cycles: 16 ( BIT 2, (HL) )
+		/// Opcode: 0XCB56, cycles: 16 ( BIT 2, (HL) )
 		static void
 		operBit_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5E, cycles: 16 ( BIT 3, (HL) )
+		/// Opcode: 0XCB5E, cycles: 16 ( BIT 3, (HL) )
 		static void
 		operBit_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB66, cycles: 16 ( BIT 4, (HL) )
+		/// Opcode: 0XCB66, cycles: 16 ( BIT 4, (HL) )
 		static void
 		operBit_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6E, cycles: 16 ( BIT 5, (HL) )
+		/// Opcode: 0XCB6E, cycles: 16 ( BIT 5, (HL) )
 		static void
 		operBit_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB76, cycles: 16 ( BIT 6, (HL) )
+		/// Opcode: 0XCB76, cycles: 16 ( BIT 6, (HL) )
 		static void
 		operBit_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7E, cycles: 16 ( BIT 7, (HL) )
+		/// Opcode: 0XCB7E, cycles: 16 ( BIT 7, (HL) )
 		static void
 		operBit_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT7, core.flags, c); }
 
-		// Opcode: 0XCB47, cycles: 8 ( BIT 0, A )
+		/// Opcode: 0XCB47, cycles: 8 ( BIT 0, A )
 		static void
 		operBit_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT0, core.flags, c); }
 
-		// Opcode: 0XCB4F, cycles: 8 ( BIT 1, A )
+		/// Opcode: 0XCB4F, cycles: 8 ( BIT 1, A )
 		static void
 		operBit_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT1, core.flags, c); }
 
-		// Opcode: 0XCB57, cycles: 8 ( BIT 2, A )
+		/// Opcode: 0XCB57, cycles: 8 ( BIT 2, A )
 		static void
 		operBit_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT2, core.flags, c); }
 
-		// Opcode: 0XCB5F, cycles: 8 ( BIT 3, A )
+		/// Opcode: 0XCB5F, cycles: 8 ( BIT 3, A )
 		static void
 		operBit_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT3, core.flags, c); }
 
-		// Opcode: 0XCB67, cycles: 8 ( BIT 4, A )
+		/// Opcode: 0XCB67, cycles: 8 ( BIT 4, A )
 		static void
 		operBit_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT4, core.flags, c); }
 
-		// Opcode: 0XCB6F, cycles: 8 ( BIT 5, A )
+		/// Opcode: 0XCB6F, cycles: 8 ( BIT 5, A )
 		static void
 		operBit_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT5, core.flags, c); }
 
-		// Opcode: 0XCB77, cycles: 8 ( BIT 6, A )
+		/// Opcode: 0XCB77, cycles: 8 ( BIT 6, A )
 		static void
 		operBit_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT6, core.flags, c); }
 
-		// Opcode: 0XCB7F, cycles: 8 ( BIT 7, A )
+		/// Opcode: 0XCB7F, cycles: 8 ( BIT 7, A )
 		static void
 		operBit_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT7, core.flags, c); }
@@ -2118,322 +2481,322 @@ namespace GBMU_NAMESPACE {
 ///TODO: All p & q have been set, find which one set to operNop
 //
 
-		// Opcode: 0XCB80, cycles: 8 ( RES 0, B )
+		/// Opcode: 0XCB80, cycles: 8 ( RES 0, B )
 		static void
 		operRes_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
 
-		// Opcode: 0XCB88, cycles: 8 ( RES 1, B )
+		/// Opcode: 0XCB88, cycles: 8 ( RES 1, B )
 		static void
 		operRes_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
 
-		// Opcode: 0XCB90, cycles: 8 ( RES 2, B )
+		/// Opcode: 0XCB90, cycles: 8 ( RES 2, B )
 		static void
 		operRes_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
 
-		// Opcode: 0XCB98, cycles: 8 ( RES 3, B )
+		/// Opcode: 0XCB98, cycles: 8 ( RES 3, B )
 		static void
 		operRes_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
 
-		// Opcode: 0XCBA0, cycles: 8 ( RES 4, B )
+		/// Opcode: 0XCBA0, cycles: 8 ( RES 4, B )
 		static void
 		operRes_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
 
-		// Opcode: 0XCBA8, cycles: 8 ( RES 5, B )
+		/// Opcode: 0XCBA8, cycles: 8 ( RES 5, B )
 		static void
 		operRes_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
 
-		// Opcode: 0XCBB0, cycles: 8 ( RES 6, B )
+		/// Opcode: 0XCBB0, cycles: 8 ( RES 6, B )
 		static void
 		operRes_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
 
-		// Opcode: 0XCBB8, cycles: 8 ( RES 7, B )
+		/// Opcode: 0XCBB8, cycles: 8 ( RES 7, B )
 		static void
 		operRes_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
 
-		// Opcode: 0XCB81, cycles: 8 ( RES 0, C )
+		/// Opcode: 0XCB81, cycles: 8 ( RES 0, C )
 		static void
 		operRes_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
 
-		// Opcode: 0XCB89, cycles: 8 ( RES 1, C )
+		/// Opcode: 0XCB89, cycles: 8 ( RES 1, C )
 		static void
 		operRes_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
 
-		// Opcode: 0XCB91, cycles: 8 ( RES 2, C )
+		/// Opcode: 0XCB91, cycles: 8 ( RES 2, C )
 		static void
 		operRes_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
 
-		// Opcode: 0XCB99, cycles: 8 ( RES 3, C )
+		/// Opcode: 0XCB99, cycles: 8 ( RES 3, C )
 		static void
 		operRes_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
 
-		// Opcode: 0XCBA1, cycles: 8 ( RES 4, C )
+		/// Opcode: 0XCBA1, cycles: 8 ( RES 4, C )
 		static void
 		operRes_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
 
-		// Opcode: 0XCBA9, cycles: 8 ( RES 5, C )
+		/// Opcode: 0XCBA9, cycles: 8 ( RES 5, C )
 		static void
 		operRes_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
 
-		// Opcode: 0XCBB1, cycles: 8 ( RES 6, C )
+		/// Opcode: 0XCBB1, cycles: 8 ( RES 6, C )
 		static void
 		operRes_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
 
-		// Opcode: 0XCBB9, cycles: 8 ( RES 7, C )
+		/// Opcode: 0XCBB9, cycles: 8 ( RES 7, C )
 		static void
 		operRes_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
 
-		// Opcode: 0ZCB82, cycles: 8 ( RES 0, D )
+		/// Opcode: 0ZCB82, cycles: 8 ( RES 0, D )
 		static void
 		operRes_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT0, c); }
 
-		// Opcode: 0XCB8A, cycles: 8 ( RES 1, D )
+		/// Opcode: 0XCB8A, cycles: 8 ( RES 1, D )
 		static void
 		operRes_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT1, c); }
 
-		// Opcode: 0XCB92, cycles: 8 ( RES 2, D )
+		/// Opcode: 0XCB92, cycles: 8 ( RES 2, D )
 		static void
 		operRes_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT2, c); }
 
-		// Opcode: 0XCB9A, cycles: 8 ( RES 3, D )
+		/// Opcode: 0XCB9A, cycles: 8 ( RES 3, D )
 		static void
 		operRes_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT3, c); }
 
-		// Opcode: OXCBA2, cycles: 8 ( RES 4, D )
+		/// Opcode: OXCBA2, cycles: 8 ( RES 4, D )
 		static void
 		operRes_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT4, c); }
 
-		// Opcode: 0XCBAA, cycles: 8 ( RES 5, D )
+		/// Opcode: 0XCBAA, cycles: 8 ( RES 5, D )
 		static void
 		operRes_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT5, c); }
 
-		// Opcode: 0XCBB2, cycles: 8 ( RES 6, D )
+		/// Opcode: 0XCBB2, cycles: 8 ( RES 6, D )
 		static void
 		operRes_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT6, c); }
 
-		// Opcode: 0XCBBA, cycles: 8 ( RES 7, D )
+		/// Opcode: 0XCBBA, cycles: 8 ( RES 7, D )
 		static void
 		operRes_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT7, c); }
 
-		// Opcode: 0XCB83, cycles: 8 ( RES 0, E )
+		/// Opcode: 0XCB83, cycles: 8 ( RES 0, E )
 		static void
 		operRes_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT0, c); }
 
-		// Opcode: 0XCB8B, cycles: 8 ( RES 1, E )
+		/// Opcode: 0XCB8B, cycles: 8 ( RES 1, E )
 		static void
 		operRes_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT1, c); }
 
-		// Opcode: 0XCB93, cycles: 8 ( RES 2, E )
+		/// Opcode: 0XCB93, cycles: 8 ( RES 2, E )
 		static void
 		operRes_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT2, c); }
 
-		// Opcode: 0XCB9B, cycles: 8 ( RES 3, E )
+		/// Opcode: 0XCB9B, cycles: 8 ( RES 3, E )
 		static void
 		operRes_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT3, c); }
 
-		// Opcode: 0XCBA3, cycles: 8 ( RES 4, E )
+		/// Opcode: 0XCBA3, cycles: 8 ( RES 4, E )
 		static void
 		operRes_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT4, c); }
 
-		// Opcode: 0XCBAB, cycles: 8 ( RES 5, E )
+		/// Opcode: 0XCBAB, cycles: 8 ( RES 5, E )
 		static void
 		operRes_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT5, c); }
 
-		// Opcode: 0XCBB3, cycles: 8 ( RES 6, E )
+		/// Opcode: 0XCBB3, cycles: 8 ( RES 6, E )
 		static void
 		operRes_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT6, c); }
 
-		// Opcode: 0XCBBB, cycles: 8 ( RES 7, E )
+		/// Opcode: 0XCBBB, cycles: 8 ( RES 7, E )
 		static void
 		operRes_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT7, c); }
 
-		// Opcode: 0XCB84, cycles: 8 ( RES 0, H )
+		/// Opcode: 0XCB84, cycles: 8 ( RES 0, H )
 		static void
 		operRes_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
 
-		// Opcode: 0XCB8C, cycles: 8 ( RES 1, H )
+		/// Opcode: 0XCB8C, cycles: 8 ( RES 1, H )
 		static void
 		operRes_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
 
-		// Opcode: 0XCB94, cycles: 8 ( RES 2, H )
+		/// Opcode: 0XCB94, cycles: 8 ( RES 2, H )
 		static void
 		operRes_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
 
-		// Opcode: 0XCB9C, cycles: 8 ( RES 3, H )
+		/// Opcode: 0XCB9C, cycles: 8 ( RES 3, H )
 		static void
 		operRes_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
 
-		// Opcode: 0XCBA4, cycles: 8 ( RES 4, H )
+		/// Opcode: 0XCBA4, cycles: 8 ( RES 4, H )
 		static void
 		operRes_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
 
-		// Opcode: 0XCBAC, cycles: 8 ( RES 5, H )
+		/// Opcode: 0XCBAC, cycles: 8 ( RES 5, H )
 		static void
 		operRes_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
 
-		// Opcode: 0XCBB4, cycles: 8 ( RES 6, H )
+		/// Opcode: 0XCBB4, cycles: 8 ( RES 6, H )
 		static void
 		operRes_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
 
-		// Opcode: 0XCBBC, cycles: 8 ( RES 7, H )
+		/// Opcode: 0XCBBC, cycles: 8 ( RES 7, H )
 		static void
 		operRes_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
 
-		// Opcode: 0XCB85, cycles: 8 ( RES 0, L )
+		/// Opcode: 0XCB85, cycles: 8 ( RES 0, L )
 		static void
 		operRes_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
 
-		// Opcode: 0XCB8D, cycles: 8 ( RES 1, L )
+		/// Opcode: 0XCB8D, cycles: 8 ( RES 1, L )
 		static void
 		operRes_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
 
-		// Opcode: 0XCB95, cycles: 8 ( RES 2, L )
+		/// Opcode: 0XCB95, cycles: 8 ( RES 2, L )
 		static void
 		operRes_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT2, c); }
 
-		// Opcode: 0XCB9D, cycles: 8 ( RES 3, L )
+		/// Opcode: 0XCB9D, cycles: 8 ( RES 3, L )
 		static void
 		operRes_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
 
-		// Opcode: 0XCBA5, cycles: 8 ( RES 4, L )
+		/// Opcode: 0XCBA5, cycles: 8 ( RES 4, L )
 		static void
 		operRes_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
 
-		// Opcode: 0XCBAD, cycles: 8 ( RES 5, L )
+		/// Opcode: 0XCBAD, cycles: 8 ( RES 5, L )
 		static void
 		operRes_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
 
-		// Opcode: 0XCBB5, cycles: 8 ( RES 6, L )
+		/// Opcode: 0XCBB5, cycles: 8 ( RES 6, L )
 		static void
 		operRes_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
 
-		// Opcode: 0XCBBD, cycles: 8 ( RES 7, L )
+		/// Opcode: 0XCBBD, cycles: 8 ( RES 7, L )
 		static void
 		operRes_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
 
-		// Opcode: 0XCB86, cycles: 8 ( RES 0, (HL) )
+		/// Opcode: 0XCB86, cycles: 8 ( RES 0, (HL) )
 		static void
 		operRes_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
 
-		// Opcode: 0XCB8E, cycles: 8 ( RES 1, (HL) )
+		/// Opcode: 0XCB8E, cycles: 8 ( RES 1, (HL) )
 		static void
 		operRes_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
 
-		// Opcode: 0XCB96, cycles: 8 ( RES 2, (HL) )
+		/// Opcode: 0XCB96, cycles: 8 ( RES 2, (HL) )
 		static void
 		operRes_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
 
-		// Opcode: 0XCB9E, cycles: 8 ( RES 3, (HL) )
+		/// Opcode: 0XCB9E, cycles: 8 ( RES 3, (HL) )
 		static void
 		operRes_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
 
-		// Opcode: 0XCBA6, cycles: 8 ( RES 4, (HL) )
+		/// Opcode: 0XCBA6, cycles: 8 ( RES 4, (HL) )
 		static void
 		operRes_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
 
-		// Opcode: 0XCBAE, cycles: 8 ( RES 5, (HL) )
+		/// Opcode: 0XCBAE, cycles: 8 ( RES 5, (HL) )
 		static void
 		operRes_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
 
-		// Opcode: 0XCBB6, cycles: 8 ( RES 6, (HL) )
+		/// Opcode: 0XCBB6, cycles: 8 ( RES 6, (HL) )
 		static void
 		operRes_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
 
-		// Opcode: 0XCBBE, cycles: 8 ( RES 7, (HL) )
+		/// Opcode: 0XCBBE, cycles: 8 ( RES 7, (HL) )
 		static void
 		operRes_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
 
-		// Opcode: 0XCB87, cycles: 8 ( RES 0, A )
+		/// Opcode: 0XCB87, cycles: 8 ( RES 0, A )
 		static void
 		operRes_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT0, c); }
 
-		// Opcode: 0XCB8F, cycles: 8 ( RES 1, A )
+		/// Opcode: 0XCB8F, cycles: 8 ( RES 1, A )
 		static void
 		operRes_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT1, c); }
 
-		// Opcode: 0XCB97, cycles: 8 ( RES 2, A )
+		/// Opcode: 0XCB97, cycles: 8 ( RES 2, A )
 		static void
 		operRes_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT2, c); }
 
-		// Opcode: 0XCB9F, cycles: 8 ( RES 3, A )
+		/// Opcode: 0XCB9F, cycles: 8 ( RES 3, A )
 		static void
 		operRes_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT3, c); }
 
-		// Opcode: 0XCBA7, cycles: 8 ( RES 4, A )
+		/// Opcode: 0XCBA7, cycles: 8 ( RES 4, A )
 		static void
 		operRes_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT4, c); }
 
-		// Opcode: 0XCBAF, cycles: 8 ( RES 5, A )
+		/// Opcode: 0XCBAF, cycles: 8 ( RES 5, A )
 		static void
 		operRes_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT5, c); }
 
-		// Opcode: 0XCBB7, cycles: 8 ( RES 6, A )
+		/// Opcode: 0XCBB7, cycles: 8 ( RES 6, A )
 		static void
 		operRes_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT6, c); }
 
-		// Opcode: 0XCBBF, cycles: 8 ( RES 7, A )
+		/// Opcode: 0XCBBF, cycles: 8 ( RES 7, A )
 		static void
 		operRes_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT7, c); }
@@ -2442,322 +2805,322 @@ namespace GBMU_NAMESPACE {
 ///TODO: All p & q have been set, find which one set to operNop
 //
 
-		// Opcode: 0XCBC0, cycles: 8 ( SET 0, B )
+		/// Opcode: 0XCBC0, cycles: 8 ( SET 0, B )
 		static void
 		operSet_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
 
-		// Opcode: OXCBC8, cycles: 8 ( SET 1, B )
+		/// Opcode: OXCBC8, cycles: 8 ( SET 1, B )
 		static void
 		operSet_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
 
-		// Opcode: 0XCBD0, cycles: 8 ( SET 2, B )
+		/// Opcode: 0XCBD0, cycles: 8 ( SET 2, B )
 		static void
 		operSet_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
 
-		// Opcode: 0XCBD8, cycles: 8 ( SET 3, B )
+		/// Opcode: 0XCBD8, cycles: 8 ( SET 3, B )
 		static void
 		operSet_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
 
-		// Opcode: 0XCBE0, cycles: 8 ( SET 4, B )
+		/// Opcode: 0XCBE0, cycles: 8 ( SET 4, B )
 		static void
 		operSet_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
 
-		// Opcode: 0XCBE8, cycles: 8 ( SET 5, B )
+		/// Opcode: 0XCBE8, cycles: 8 ( SET 5, B )
 		static void
 		operSet_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
 
-		// Opcode: 0XCBF0, cycles: 8 ( SET 6, B )
+		/// Opcode: 0XCBF0, cycles: 8 ( SET 6, B )
 		static void
 		operSet_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
 
-		// Opcode: 0XCBF8, cycles: 8 ( SET 7, B )
+		/// Opcode: 0XCBF8, cycles: 8 ( SET 7, B )
 		static void
 		operSet_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
 
-		// Opcode: 0XCBC1, cycles: 8 ( SET 0, C )
+		/// Opcode: 0XCBC1, cycles: 8 ( SET 0, C )
 		static void
 		operSet_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
 
-		// Opcode: 0XCBC9, cycles: 8 ( SET 1, C )
+		/// Opcode: 0XCBC9, cycles: 8 ( SET 1, C )
 		static void
 		operSet_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
 
-		// Opcode: 0XCBD1, cycles: 8 ( SET 2, C )
+		/// Opcode: 0XCBD1, cycles: 8 ( SET 2, C )
 		static void
 		operSet_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
 
-		// Opcode: 0XCBD9, cycles: 8 ( SET 3, C )
+		/// Opcode: 0XCBD9, cycles: 8 ( SET 3, C )
 		static void
 		operSet_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
 
-		// Opcode: 0XCBE1, cycles: 8 ( SET 4, C )
+		/// Opcode: 0XCBE1, cycles: 8 ( SET 4, C )
 		static void
 		operSet_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
 
-		// Opcode: 0XCBE9, cycles: 8 ( SET 5, C )
+		/// Opcode: 0XCBE9, cycles: 8 ( SET 5, C )
 		static void
 		operSet_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
 
-		// Opcode: 0XCBF1, cycles: 8 ( SET 6, C )
+		/// Opcode: 0XCBF1, cycles: 8 ( SET 6, C )
 		static void
 		operSet_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
 
-		// Opcode: 0XCBF9, cycles: 8 ( SET 7, C )
+		/// Opcode: 0XCBF9, cycles: 8 ( SET 7, C )
 		static void
 		operSet_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
 
-		// Opcode: 0XCBC2, cycles: 8 ( SET 0, D )
+		/// Opcode: 0XCBC2, cycles: 8 ( SET 0, D )
 		static void
 		operSet_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT0, c); }
 
-		// Opcode: 0CCBCA, cycles: 8 ( SET 1, D )
+		/// Opcode: 0CCBCA, cycles: 8 ( SET 1, D )
 		static void
 		operSet_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT1, c); }
 
-		// Opcode: 0XCBD2, cycles: 8 ( SET 2, D )
+		/// Opcode: 0XCBD2, cycles: 8 ( SET 2, D )
 		static void
 		operSet_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT2, c); }
 
-		// Opcode: 0XCBDA, cycles: 8 ( SET 3, D )
+		/// Opcode: 0XCBDA, cycles: 8 ( SET 3, D )
 		static void
 		operSet_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT3, c); }
 
-		// Opcode: 0XCBE2, cycles: 8 ( SET 4, D )
+		/// Opcode: 0XCBE2, cycles: 8 ( SET 4, D )
 		static void
 		operSet_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT4, c); }
 
-		// Opcode: 0XCBEA, cycles: 8 ( SET 5, D )
+		/// Opcode: 0XCBEA, cycles: 8 ( SET 5, D )
 		static void
 		operSet_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT5, c); }
 
-		// Opcode: 0XCBF2, cycles: 8 ( SET 6, D )
+		/// Opcode: 0XCBF2, cycles: 8 ( SET 6, D )
 		static void
 		operSet_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT6, c); }
 
-		// Opcode: 0XCBFA, cycles: 8 ( SET 7, D )
+		/// Opcode: 0XCBFA, cycles: 8 ( SET 7, D )
 		static void
 		operSet_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT7, c); }
 
-		// Opcode: 0XCBC3, cycles: 8 ( SET 0, E )
+		/// Opcode: 0XCBC3, cycles: 8 ( SET 0, E )
 		static void
 		operSet_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT0, c); }
 
-		// Opcode: 0XCBCB, cycles: 8 ( SET 1, E )
+		/// Opcode: 0XCBCB, cycles: 8 ( SET 1, E )
 		static void
 		operSet_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT1, c); }
 
-		// Opcode: 0XCBD3, cycles: 8 ( SET 2, E )
+		/// Opcode: 0XCBD3, cycles: 8 ( SET 2, E )
 		static void
 		operSet_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT2, c); }
 
-		// Opcode: 0XCBDB, cycles: 8 ( SET 3, E )
+		/// Opcode: 0XCBDB, cycles: 8 ( SET 3, E )
 		static void
 		operSet_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT3, c); }
 
-		// Opcode: 0XCBE3, cycles: 8 ( SET 4, E )
+		/// Opcode: 0XCBE3, cycles: 8 ( SET 4, E )
 		static void
 		operSet_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT4, c); }
 
-		// Opcode: 0XCBEB, cycles: 8 ( SET 5, E )
+		/// Opcode: 0XCBEB, cycles: 8 ( SET 5, E )
 		static void
 		operSet_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT5, c); }
 
-		// Opcode: 0XCBF3, cycles: 8 ( SET 6, E )
+		/// Opcode: 0XCBF3, cycles: 8 ( SET 6, E )
 		static void
 		operSet_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT6, c); }
 
-		// Opcode: 0XCBFB, cycles: 8 ( SET 7, E )
+		/// Opcode: 0XCBFB, cycles: 8 ( SET 7, E )
 		static void
 		operSet_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT7, c); }
 
-		// Opcode: 0XCBC4, cycles: 8 ( SET 0, H )
+		/// Opcode: 0XCBC4, cycles: 8 ( SET 0, H )
 		static void
 		operSet_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
 
-		// Opcode: 0XCBCC, cycles: 8 ( SET 1, H )
+		/// Opcode: 0XCBCC, cycles: 8 ( SET 1, H )
 		static void
 		operSet_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
 
-		// Opcode: 0XCBD4, cycles: 8 ( SET 2, H )
+		/// Opcode: 0XCBD4, cycles: 8 ( SET 2, H )
 		static void
 		operSet_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
 
-		// Opcode: 0XCBDC, cycles: 8 ( SET 3, H )
+		/// Opcode: 0XCBDC, cycles: 8 ( SET 3, H )
 		static void
 		operSet_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
 
-		// Opcode: 0XCBE4, cycles: 8 ( SET 4, H )
+		/// Opcode: 0XCBE4, cycles: 8 ( SET 4, H )
 		static void
 		operSet_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
 
-		// Opcode: 0XCBEC, cycles: 8 ( SET 5, H )
+		/// Opcode: 0XCBEC, cycles: 8 ( SET 5, H )
 		static void
 		operSet_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
 
-		// Opcode: 0XCBF4, cycles: 8 ( SET 6, H )
+		/// Opcode: 0XCBF4, cycles: 8 ( SET 6, H )
 		static void
 		operSet_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
 
-		// Opcode: 0XCBFC, cycles: 8 ( SET 7, H )
+		/// Opcode: 0XCBFC, cycles: 8 ( SET 7, H )
 		static void
 		operSet_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
 
-		// Opcode: 0XCBC5, cycles: 8 ( SET 0, L )
+		/// Opcode: 0XCBC5, cycles: 8 ( SET 0, L )
 		static void
 		operSet_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
 
-		// Opcode: 0XCBCD, cycles: 8 ( SET 1, L )
+		/// Opcode: 0XCBCD, cycles: 8 ( SET 1, L )
 		static void
 		operSet_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
 
-		// Opcode: 0XCBD5, cycles: 8 ( SET 2, L )
+		/// Opcode: 0XCBD5, cycles: 8 ( SET 2, L )
 		static void
 		operSet_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
 
-		// Opcode: 0XCBDD, cycles: 8 ( SET 3, L )
+		/// Opcode: 0XCBDD, cycles: 8 ( SET 3, L )
 		static void
 		operSet_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
 
-		// Opcode: 0XCBE5, cycles: 8 ( SET 4, L )
+		/// Opcode: 0XCBE5, cycles: 8 ( SET 4, L )
 		static void
 		operSet_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
 
-		// Opcode: 0XCBED, cycles: 8 ( SET 5, L )
+		/// Opcode: 0XCBED, cycles: 8 ( SET 5, L )
 		static void
 		operSet_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
 
-		// Opcode: 0XCBF5, cycles: 8 ( SET 6, L )
+		/// Opcode: 0XCBF5, cycles: 8 ( SET 6, L )
 		static void
 		operSet_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
 
-		// Opcode: OXCBFD, cycles: 8 ( SET 7, L )
+		/// Opcode: OXCBFD, cycles: 8 ( SET 7, L )
 		static void
 		operSet_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
 
-		// Opcode: 0XCBC6, cycles: 16 ( SET 0, (HL) )
+		/// Opcode: 0XCBC6, cycles: 16 ( SET 0, (HL) )
 		static void
 		operSet_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
 
-		// Opcode: 0XCBCE, cycles: 16 ( SET 1, (HL) )
+		/// Opcode: 0XCBCE, cycles: 16 ( SET 1, (HL) )
 		static void
 		operSet_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
 
-		// Opcode: 0XCBD6, cycles: 16 ( SET 2, (HL) )
+		/// Opcode: 0XCBD6, cycles: 16 ( SET 2, (HL) )
 		static void
 		operSet_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
 
-		// Opcode: 0XCBDE, cycles: 16 ( SET 3, (HL) )
+		/// Opcode: 0XCBDE, cycles: 16 ( SET 3, (HL) )
 		static void
 		operSet_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
 
-		// Opcode: 0XCBE6, cycles: 16 ( SET 4, (HL) )
+		/// Opcode: 0XCBE6, cycles: 16 ( SET 4, (HL) )
 		static void
 		operSet_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
 
-		// Opcode: 0XCBEE, cycles: 16 ( SET 5, (HL) )
+		/// Opcode: 0XCBEE, cycles: 16 ( SET 5, (HL) )
 		static void
 		operSet_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
 
-		// Opcode: 0XCBF6, cycles: 16 ( SET 6, (HL) )
+		/// Opcode: 0XCBF6, cycles: 16 ( SET 6, (HL) )
 		static void
 		operSet_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
 
-		// Opcode: 0XCBFE, cycles: 16 ( SET 7, (HL) )
+		/// Opcode: 0XCBFE, cycles: 16 ( SET 7, (HL) )
 		static void
 		operSet_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
 
-		// Opcode: 0XCBC7, cycles: 8 ( SET 0, A )
+		/// Opcode: 0XCBC7, cycles: 8 ( SET 0, A )
 		static void
 		operSet_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT0, c); }
 
-		// Opcode: 0XCBCF, cycles: 8 ( SET 1, A )
+		/// Opcode: 0XCBCF, cycles: 8 ( SET 1, A )
 		static void
 		operSet_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT1, c); }
 
-		// Opcode: 0XCBD7, cycles: 8 ( SET 2, A )
+		/// Opcode: 0XCBD7, cycles: 8 ( SET 2, A )
 		static void
 		operSet_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT2, c); }
 
-		// Opcode: 0XCBDF, cycles: 8 ( SET 3, A )
+		/// Opcode: 0XCBDF, cycles: 8 ( SET 3, A )
 		static void
 		operSet_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT3, c); }
 
-		// Opcode: 0XCBE7, cycles: 8 ( SET 4, A )
+		/// Opcode: 0XCBE7, cycles: 8 ( SET 4, A )
 		static void
 		operSet_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT4, c); }
 
-		// Opcode: 0XCBEF, cycles: 8 ( SET 5, A )
+		/// Opcode: 0XCBEF, cycles: 8 ( SET 5, A )
 		static void
 		operSet_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT5, c); }
 
-		// Opcode: 0XCBF7, cycles: 8 ( SET 6, A )
+		/// Opcode: 0XCBF7, cycles: 8 ( SET 6, A )
 		static void
 		operSet_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT6, c); }
 
-		// Opcode: 0XCBFF, cycles: 8 ( SET 7, A )
+		/// Opcode: 0XCBFF, cycles: 8 ( SET 7, A )
 		static void
 		operSet_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT7, c); }
@@ -9269,7 +9632,7 @@ namespace GBMU_NAMESPACE {
 								/* P = 1 */
 								&OperNop,
 								/* P = 2 */
-								&OperNop,
+								&OperNop,/* value pointed by */
 								/* P = 3 */
 								&OperNop
 							},
@@ -9299,24 +9662,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 3 */
-								&OperNop
+								&operRLC_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_B,
 								/* P = 3 */
-								&OperNop
+								&operRLC_B
 							}
 						},
 						/* Y = 1 */
@@ -9324,24 +9687,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 3 */
-								&OperNop
+								&operRRC_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_B,
 								/* P = 3 */
-								&OperNop
+								&operRRC_B
 							}
 						},
 						/* Y = 2 */
@@ -9349,24 +9712,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_B,
 								/* P = 1 */
-								&OperNop,
+								&operRL_B,
 								/* P = 2 */
-								&OperNop,
+								&operRL_B,
 								/* P = 3 */
-								&OperNop
+								&operRL_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_B,
 								/* P = 1 */
-								&OperNop,
+								&operRL_B,
 								/* P = 2 */
-								&OperNop,
+								&operRL_B,
 								/* P = 3 */
-								&OperNop
+								&operRL_B
 							}
 						},
 						/* Y = 3 */
@@ -9374,24 +9737,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_B,
 								/* P = 1 */
-								&OperNop,
+								&operRR_B,
 								/* P = 2 */
-								&OperNop,
+								&operRR_B,
 								/* P = 3 */
-								&OperNop
+								&operRR_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_B,
 								/* P = 1 */
-								&OperNop,
+								&operRR_B,
 								/* P = 2 */
-								&OperNop,
+								&operRR_B,
 								/* P = 3 */
-								&OperNop
+								&operRR_B
 							}
 						},
 						/* Y = 4 */
@@ -9399,24 +9762,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 3 */
-								&OperNop
+								&operSLA_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_B,
 								/* P = 3 */
-								&OperNop
+								&operSLA_B
 							}
 						},
 						/* Y = 5 */
@@ -9424,24 +9787,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 3 */
-								&OperNop
+								&operSRA_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_B,
 								/* P = 3 */
-								&OperNop
+								&operSRA_B
 							}
 						},
 						/* Y = 6 */
@@ -9474,24 +9837,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 3 */
-								&OperNop
+								&operSRL_B
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_B,
 								/* P = 3 */
-								&OperNop
+								&operSRL_B
 							}
 						}
 					},
@@ -9502,24 +9865,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 3 */
-								&OperNop
+								&operRLC_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_C,
 								/* P = 3 */
-								&OperNop
+								&operRLC_C
 							}
 						},
 						/* Y = 1 */
@@ -9527,24 +9890,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 3 */
-								&OperNop
+								&operRRC_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_C,
 								/* P = 3 */
-								&OperNop
+								&operRRC_C
 							}
 						},
 						/* Y = 2 */
@@ -9552,24 +9915,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_C,
 								/* P = 1 */
-								&OperNop,
+								&operRL_C,
 								/* P = 2 */
-								&OperNop,
+								&operRL_C,
 								/* P = 3 */
-								&OperNop
+								&operRL_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_C,
 								/* P = 1 */
-								&OperNop,
+								&operRL_C,
 								/* P = 2 */
-								&OperNop,
+								&operRL_C,
 								/* P = 3 */
-								&OperNop
+								&operRL_C
 							}
 						},
 						/* Y = 3 */
@@ -9577,24 +9940,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_C,
 								/* P = 1 */
-								&OperNop,
+								&operRR_C,
 								/* P = 2 */
-								&OperNop,
+								&operRR_C,
 								/* P = 3 */
-								&OperNop
+								&operRR_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_C,
 								/* P = 1 */
-								&OperNop,
+								&operRR_C,
 								/* P = 2 */
-								&OperNop,
+								&operRR_C,
 								/* P = 3 */
-								&OperNop
+								&operRR_C
 							}
 						},
 						/* Y = 4 */
@@ -9602,24 +9965,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 3 */
-								&OperNop
+								&operSLA_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_C,
 								/* P = 3 */
-								&OperNop
+								&operSLA_C
 							}
 						},
 						/* Y = 5 */
@@ -9627,24 +9990,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 3 */
-								&OperNop
+								&operSRA_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_C,
 								/* P = 3 */
-								&OperNop
+								&operSRA_C
 							}
 						},
 						/* Y = 6 */
@@ -9677,24 +10040,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 3 */
-								&OperNop
+								&operSRL_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_C,
 								/* P = 3 */
-								&OperNop
+								&operSRL_C
 							}
 						}
 					},
@@ -9705,24 +10068,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 3 */
-								&OperNop
+								&operRLC_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_D,
 								/* P = 3 */
-								&OperNop
+								&operRLC_D
 							}
 						},
 						/* Y = 1 */
@@ -9730,24 +10093,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 3 */
-								&OperNop
+								&operRRC_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_D,
 								/* P = 3 */
-								&OperNop
+								&operRRC_D
 							}
 						},
 						/* Y = 2 */
@@ -9755,24 +10118,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_D,
 								/* P = 1 */
-								&OperNop,
+								&operRL_D,
 								/* P = 2 */
-								&OperNop,
+								&operRL_D,
 								/* P = 3 */
-								&OperNop
+								&operRL_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_D,
 								/* P = 1 */
-								&OperNop,
+								&operRL_D,
 								/* P = 2 */
-								&OperNop,
+								&operRL_D,
 								/* P = 3 */
-								&OperNop
+								&operRL_D
 							}
 						},
 						/* Y = 3 */
@@ -9780,24 +10143,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_D,
 								/* P = 1 */
-								&OperNop,
+								&operRR_D,
 								/* P = 2 */
-								&OperNop,
+								&operRR_D,
 								/* P = 3 */
-								&OperNop
+								&operRR_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_D,
 								/* P = 1 */
-								&OperNop,
+								&operRR_D,
 								/* P = 2 */
-								&OperNop,
+								&operRR_D,
 								/* P = 3 */
-								&OperNop
+								&operRR_D
 							}
 						},
 						/* Y = 4 */
@@ -9805,24 +10168,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 3 */
-								&OperNop
+								&operSLA_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_D,
 								/* P = 3 */
-								&OperNop
+								&operSLA_D
 							}
 						},
 						/* Y = 5 */
@@ -9830,24 +10193,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 3 */
-								&OperNop
+								&operSRA_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_D,
 								/* P = 3 */
-								&OperNop
+								&operSRA_D
 							}
 						},
 						/* Y = 6 */
@@ -9880,24 +10243,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 3 */
-								&OperNop
+								&operSRL_D
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_D,
 								/* P = 3 */
-								&OperNop
+								&operSRL_D
 							}
 						}
 					},
@@ -9908,24 +10271,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 3 */
-								&OperNop
+								&operRLC_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_E,
 								/* P = 3 */
-								&OperNop
+								&operRLC_E
 							}
 						},
 						/* Y = 1 */
@@ -9933,24 +10296,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 3 */
-								&OperNop
+								&operRRC_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_E,
 								/* P = 3 */
-								&OperNop
+								&operRRC_E
 							}
 						},
 						/* Y = 2 */
@@ -9958,24 +10321,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_E,
 								/* P = 1 */
-								&OperNop,
+								&operRL_E,
 								/* P = 2 */
-								&OperNop,
+								&operRL_E,
 								/* P = 3 */
-								&OperNop
+								&operRL_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_E,
 								/* P = 1 */
-								&OperNop,
+								&operRL_E,
 								/* P = 2 */
-								&OperNop,
+								&operRL_E,
 								/* P = 3 */
-								&OperNop
+								&operRL_E
 							}
 						},
 						/* Y = 3 */
@@ -9983,24 +10346,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_E,
 								/* P = 1 */
-								&OperNop,
+								&operRR_E,
 								/* P = 2 */
-								&OperNop,
+								&operRR_E,
 								/* P = 3 */
-								&OperNop
+								&operRR_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_E,
 								/* P = 1 */
-								&OperNop,
+								&operRR_E,
 								/* P = 2 */
-								&OperNop,
+								&operRR_E,
 								/* P = 3 */
-								&OperNop
+								&operRR_E
 							}
 						},
 						/* Y = 4 */
@@ -10008,24 +10371,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 3 */
-								&OperNop
+								&operSLA_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_E,
 								/* P = 3 */
-								&OperNop
+								&operSLA_E
 							}
 						},
 						/* Y = 5 */
@@ -10033,24 +10396,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 3 */
-								&OperNop
+								&operSRA_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_E,
 								/* P = 3 */
-								&OperNop
+								&operSRA_E
 							}
 						},
 						/* Y = 6 */
@@ -10083,24 +10446,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 3 */
-								&OperNop
+								&operSRL_E
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_E,
 								/* P = 3 */
-								&OperNop
+								&operSRL_E
 							}
 						}
 					},
@@ -10111,24 +10474,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 3 */
-								&OperNop
+								&operRLC_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_H,
 								/* P = 3 */
-								&OperNop
+								&operRLC_H
 							}
 						},
 						/* Y = 1 */
@@ -10136,24 +10499,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 3 */
-								&OperNop
+								&operRRC_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_H,
 								/* P = 3 */
-								&OperNop
+								&operRRC_H
 							}
 						},
 						/* Y = 2 */
@@ -10161,24 +10524,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_H,
 								/* P = 1 */
-								&OperNop,
+								&operRL_H,
 								/* P = 2 */
-								&OperNop,
+								&operRL_H,
 								/* P = 3 */
-								&OperNop
+								&operRL_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_H,
 								/* P = 1 */
-								&OperNop,
+								&operRL_H,
 								/* P = 2 */
-								&OperNop,
+								&operRL_H,
 								/* P = 3 */
-								&OperNop
+								&operRL_H
 							}
 						},
 						/* Y = 3 */
@@ -10186,24 +10549,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_H,
 								/* P = 1 */
-								&OperNop,
+								&operRR_H,
 								/* P = 2 */
-								&OperNop,
+								&operRR_H,
 								/* P = 3 */
-								&OperNop
+								&operRR_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_H,
 								/* P = 1 */
-								&OperNop,
+								&operRR_H,
 								/* P = 2 */
-								&OperNop,
+								&operRR_H,
 								/* P = 3 */
-								&OperNop
+								&operRR_H
 							}
 						},
 						/* Y = 4 */
@@ -10211,24 +10574,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 3 */
-								&OperNop
+								&operSLA_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_H,
 								/* P = 3 */
-								&OperNop
+								&operSLA_H
 							}
 						},
 						/* Y = 5 */
@@ -10236,24 +10599,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 3 */
-								&OperNop
+								&operSRA_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_H,
 								/* P = 3 */
-								&OperNop
+								&operSRA_H
 							}
 						},
 						/* Y = 6 */
@@ -10286,24 +10649,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 3 */
-								&OperNop
+								&operSRL_H
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_H,
 								/* P = 3 */
-								&OperNop
+								&operSRL_H
 							}
 						}
 					},
@@ -10314,24 +10677,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 3 */
-								&OperNop
+								&operRLC_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_L,
 								/* P = 3 */
-								&OperNop
+								&operRLC_L
 							}
 						},
 						/* Y = 1 */
@@ -10339,24 +10702,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 3 */
-								&OperNop
+								&operRRC_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_L,
 								/* P = 3 */
-								&OperNop
+								&operRRC_L
 							}
 						},
 						/* Y = 2 */
@@ -10364,24 +10727,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_L,
 								/* P = 1 */
-								&OperNop,
+								&operRL_L,
 								/* P = 2 */
-								&OperNop,
+								&operRL_L,
 								/* P = 3 */
-								&OperNop
+								&operRL_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_L,
 								/* P = 1 */
-								&OperNop,
+								&operRL_L,
 								/* P = 2 */
-								&OperNop,
+								&operRL_L,
 								/* P = 3 */
-								&OperNop
+								&operRL_L
 							}
 						},
 						/* Y = 3 */
@@ -10389,24 +10752,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_L,
 								/* P = 1 */
-								&OperNop,
+								&operRR_L,
 								/* P = 2 */
-								&OperNop,
+								&operRR_L,
 								/* P = 3 */
-								&OperNop
+								&operRR_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_L,
 								/* P = 1 */
-								&OperNop,
+								&operRR_L,
 								/* P = 2 */
-								&OperNop,
+								&operRR_L,
 								/* P = 3 */
-								&OperNop
+								&operRR_L
 							}
 						},
 						/* Y = 4 */
@@ -10414,24 +10777,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 3 */
-								&OperNop
+								&operSLA_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_L,
 								/* P = 3 */
-								&OperNop
+								&operSLA_L
 							}
 						},
 						/* Y = 5 */
@@ -10439,24 +10802,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 3 */
-								&OperNop
+								&operSRA_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_L,
 								/* P = 3 */
-								&OperNop
+								&operSRA_L
 							}
 						},
 						/* Y = 6 */
@@ -10489,24 +10852,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 3 */
-								&OperNop
+								&operSRL_L
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_L,
 								/* P = 3 */
-								&OperNop
+								&operSRL_L
 							}
 						}
 					},
@@ -10517,24 +10880,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRLC_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRLC_PAddrHL
 							}
 						},
 						/* Y = 1 */
@@ -10542,24 +10905,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRRC_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRRC_PAddrHL
 							}
 						},
 						/* Y = 2 */
@@ -10567,24 +10930,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRL_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRL_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRL_PAddrHL
 							}
 						},
 						/* Y = 3 */
@@ -10592,24 +10955,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRR_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operRR_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operRR_PAddrHL
 							}
 						},
 						/* Y = 4 */
@@ -10617,24 +10980,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSLA_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSLA_PAddrHL
 							}
 						},
 						/* Y = 5 */
@@ -10642,24 +11005,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSRA_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSRA_PAddrHL
 							}
 						},
 						/* Y = 6 */
@@ -10692,24 +11055,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSRL_PAddrHL
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_PAddrHL,
 								/* P = 3 */
-								&OperNop
+								&operSRL_PAddrHL
 							}
 						}
 					},
@@ -10720,24 +11083,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 3 */
-								&OperNop
+								&operRLC_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 1 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 2 */
-								&OperNop,
+								&operRLC_A,
 								/* P = 3 */
-								&OperNop
+								&operRLC_A
 							}
 						},
 						/* Y = 1 */
@@ -10745,24 +11108,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 3 */
-								&OperNop
+								&operRRC_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 1 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 2 */
-								&OperNop,
+								&operRRC_A,
 								/* P = 3 */
-								&OperNop
+								&operRRC_A
 							}
 						},
 						/* Y = 2 */
@@ -10770,24 +11133,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_A,
 								/* P = 1 */
-								&OperNop,
+								&operRL_A,
 								/* P = 2 */
-								&OperNop,
+								&operRL_A,
 								/* P = 3 */
-								&OperNop
+								&operRL_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRL_A,
 								/* P = 1 */
-								&OperNop,
+								&operRL_A,
 								/* P = 2 */
-								&OperNop,
+								&operRL_A,
 								/* P = 3 */
-								&OperNop
+								&operRL_A
 							}
 						},
 						/* Y = 3 */
@@ -10795,24 +11158,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_A,
 								/* P = 1 */
-								&OperNop,
+								&operRR_A,
 								/* P = 2 */
-								&OperNop,
+								&operRR_A,
 								/* P = 3 */
-								&OperNop
+								&operRR_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRR_A,
 								/* P = 1 */
-								&OperNop,
+								&operRR_A,
 								/* P = 2 */
-								&OperNop,
+								&operRR_A,
 								/* P = 3 */
-								&OperNop
+								&operRR_A
 							}
 						},
 						/* Y = 4 */
@@ -10820,24 +11183,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 3 */
-								&OperNop
+								&operSLA_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 1 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 2 */
-								&OperNop,
+								&operSLA_A,
 								/* P = 3 */
-								&OperNop
+								&operSLA_A
 							}
 						},
 						/* Y = 5 */
@@ -10845,24 +11208,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 3 */
-								&OperNop
+								&operSRA_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 1 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 2 */
-								&OperNop,
+								&operSRA_A,
 								/* P = 3 */
-								&OperNop
+								&operSRA_A
 							}
 						},
 						/* Y = 6 */
@@ -10895,24 +11258,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 3 */
-								&OperNop
+								&operSRL_A
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 1 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 2 */
-								&OperNop,
+								&operSRL_A,
 								/* P = 3 */
-								&OperNop
+								&operSRL_A
 							}
 						}
 					}
