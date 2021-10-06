@@ -289,6 +289,25 @@ namespace GBMU_NAMESPACE {
 		{ }
 	};
 
+	enum Z80Flags
+	{
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+		// | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+		// | Z | N | H | C | 0 | 0 | 0 | 0 |
+		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+		FLAG_BIT0		= (1 << 0),
+		FLAG_BIT1		= (FLAG_BIT0 << 1),
+		FLAG_BIT2		= (FLAG_BIT1 << 1),
+		FLAG_BIT3		= (FLAG_BIT2 << 1),
+		FLAG_ZERO		= (FLAG_BIT3 << 1),
+		FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
+		FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
+		FLAG_CARRY		= (FLAG_HALF_CARRY << 1),
+
+	};
+
 	template <class Memory>
     class CPUZ80
 	: protected CPU<Memory, Z80Registers, uint8_t>
@@ -306,28 +325,6 @@ namespace GBMU_NAMESPACE {
 
 		typedef std::size_t 	size_type;
 		typedef std::ptrdiff_t	ptrdiff_type;
-
-		public:
-
-		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-		// | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-		// | Z | N | H | C | 0 | 0 | 0 | 0 |
-		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-		enum flags
-		{
-			FLAG_BIT0		= (1 << 0),
-			FLAG_BIT1		= (FLAG_BIT0 << 1),
-			FLAG_BIT2		= (FLAG_BIT1 << 1),
-			FLAG_BIT3		= (FLAG_BIT2 << 1),
-			FLAG_ZERO		= (FLAG_BIT3 << 1),
-			FLAG_SUBSTRACT	= (FLAG_ZERO << 1),
-			FLAG_HALF_CARRY	= (FLAG_SUBSTRACT << 1),
-			FLAG_CARRY		= (FLAG_HALF_CARRY << 1),
-
-		};
-
-		private:
 
 		struct ExceptionBadUse : std::exception
 		{ const char* what() { return "Bad use of method"; } };
@@ -367,7 +364,7 @@ namespace GBMU_NAMESPACE {
 			dest = src;
 		}
 
-		template <typename T, typename Flags, int64_t cycles>
+		template <typename T, int64_t cycles>
 		__attribute__ ((always_inline))
 		static inline void
 		operBaseInc(T& target, Chrono& c)
@@ -377,7 +374,7 @@ namespace GBMU_NAMESPACE {
 			c.setCycles(cycles);
 		}
 
-		template <typename T, typename Flags, int64_t cycles>
+		template <typename T, int64_t cycles>
 		__attribute__ ((always_inline))
 		static inline void
 		operBaseDec(T& target, Chrono& c)
@@ -506,55 +503,60 @@ namespace GBMU_NAMESPACE {
 		operBaseBit(T& dest, T bitMask, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if bit b of register r is 0.
   				N - Reset.
   				H - Set.
   				C - Not affected.
 			*/
-			static_cast<void>(flags);
-
 
 			if (FGMASK_HAS(dest, bitMask) == false)
-				; // Set Z flag
-			// Reset N flag
-			// Set H flag
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT);
+			FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY);
 			c.setCycles(cycles);
 		}
 
 		template <typename T, typename Flags, int64_t cycles = 8>
 		static inline void
 		__attribute__ ((always_inline))
-		operBaseRotateLelf(T& dest, Flags flags, Chrono& c)
+		operBaseRotateLeft(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 7 data.
 			*/
-			static_cast<void>(flags);
+			///TODO: what means "rotate left throught the carry flag" ? (not implemented)
 
-			dest = Z80WORD_ROTLEFT(dest, 1);
+			if ((dest = Z80WORD_ROTLEFT(dest, 1)) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT0))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 
 		template <typename T, typename Flags, int64_t cycles = 8>
 		static inline void
 		__attribute__ ((always_inline))
-		operBaseRotateLelfCarry(T& dest, Flags flags, Chrono& c)
+		operBaseRotateLeftCarry(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 7 data.
 			*/
-			static_cast<void>(flags);
 
-			dest = Z80WORD_ROTLEFT(dest, 1);
+			if ((dest = Z80WORD_ROTLEFT(dest, 1)) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT0))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 
@@ -564,15 +566,18 @@ namespace GBMU_NAMESPACE {
 		operBaseRotateRightCarry(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 0 data.
 			*/
-			static_cast<void>(flags);
 
-			dest = Z80WORD_ROTRIGHT(dest, 1);
+			if ((dest = Z80WORD_ROTRIGHT(dest, 1)) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT7))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 
@@ -582,15 +587,21 @@ namespace GBMU_NAMESPACE {
 		operBaseRotateRight(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 0 data.
 			*/
 			static_cast<void>(flags);
+			///TODO: what means "rotate right throught the carry flag" ? (not implemented)
 
-			dest = Z80WORD_ROTRIGHT(dest, 1);
+
+			if ((dest = Z80WORD_ROTRIGHT(dest, 1)) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT7))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 
@@ -600,15 +611,18 @@ namespace GBMU_NAMESPACE {
 		operBaseShiftLeft(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 7 data.
 			*/
-			static_cast<void>(flags);
 
-			dest <<= 1;
+			if ((dest <<= 1) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT0))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 
@@ -618,15 +632,18 @@ namespace GBMU_NAMESPACE {
 		operBaseShiftRight(T& dest, Flags flags, Chrono& c)
 		noexcept
 		{
-			/** TODO:
+			/** NOTE:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Contains old bit 0 data.
 			*/
-			static_cast<void>(flags);
 
-			dest >>= 1;
+			if ((dest >>= 1) == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, (Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY));
+			if (FGMASK_HAS(dest, MASKBIT7))
+				FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
 			c.setCycles(cycles);
 		}
 		///TODO: functions calling this can set MSB to 0 or not change its value.
@@ -730,20 +747,42 @@ namespace GBMU_NAMESPACE {
 ///TODO: may need std::forward to pass c as move (or maybe i can't pass it as move value)
 //
 
-		/** NOTE: Flags affected:
-			Z - Set if result is zero.
-			N - Reset.
-			H - Set if carry from bit 4.
-			C - Not affected.
-		*/
 		template <typename V>
 		static void inline
 		handleFlagsIncWord(typename CPU<Memory, Z80Registers, uint8_t>::flags_t& flags, const V value)
 		noexcept
 		{
-			///TODO:
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			/** NOTE: Flags affected:
+				Z - Set if result is zero.
+				N - Reset.
+				H - Set if carry from bit 3.
+				C - Not affected.
+			*/
+
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT);
+			if (FGMASK_HAS(flags, Z80Flags::FLAG_CARRY) && FGMASK_HAS(value, MASKBIT3))
+				FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY);
+		}
+
+		template <typename V>
+		static void inline
+		handleFlagsDecWord(typename CPU<Memory, Z80Registers, uint8_t>::flags_t& flags, const V value)
+		noexcept
+		{
+			/** NOTE: Flags affected:
+				Z - Set if result is zero.
+				N - Reset.
+				H - Set if carry from bit 4.
+				C - Not affected.
+			*/
+
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT);
+			if (FGMASK_HAS(flags, Z80Flags::FLAG_CARRY) && FGMASK_HAS(value, MASKBIT4))
+				FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY);
 		}
 
 		/// Opcode: 0X04, cycles: 4 ( INC B )
@@ -815,7 +854,7 @@ namespace GBMU_NAMESPACE {
 		operDecB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.bcwords.b, c);
-			handleFlagsIncWord(core.flags, core.regs.bcwords.b);
+			handleFlagsDecWord(core.flags, core.regs.bcwords.b);
 		}
 
 		/// Opcode: 0X0D, cycles: 4 ( DEC C )
@@ -823,7 +862,7 @@ namespace GBMU_NAMESPACE {
 		operDecC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.bcwords.c, c);
-			handleFlagsIncWord(core.flags, core.regs.bcwords.c);
+			handleFlagsDecWord(core.flags, core.regs.bcwords.c);
 		}
 
 		/// Opcode: 0X15, cycles: 4 ( DEC D )
@@ -831,7 +870,7 @@ namespace GBMU_NAMESPACE {
 		operDecD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.dewords.d, c);
-			handleFlagsIncWord(core.flags, core.regs.dewords.d);
+			handleFlagsDecWord(core.flags, core.regs.dewords.d);
 		}
 
 		/// Opcode: 0X1D, cycles: 4 ( DEC E )
@@ -839,7 +878,7 @@ namespace GBMU_NAMESPACE {
 		operDecE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.dewords.e, c);
-			handleFlagsIncWord(core.flags, core.regs.dewords.e);
+			handleFlagsDecWord(core.flags, core.regs.dewords.e);
 		}
 
 		/// Opcode: 0X25, cycles: 4 ( DEC H )
@@ -847,7 +886,7 @@ namespace GBMU_NAMESPACE {
 		operDecH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.hlwords.h, c);
-			handleFlagsIncWord(core.flags, core.regs.hlwords.h);
+			handleFlagsDecWord(core.flags, core.regs.hlwords.h);
 		}
 
 		/// Opcode: 0X2D, cycles: 4 ( DEC L )
@@ -855,7 +894,7 @@ namespace GBMU_NAMESPACE {
 		operDecL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.hlwords.l, c);
-			handleFlagsIncWord(core.flags, core.regs.hlwords.l);
+			handleFlagsDecWord(core.flags, core.regs.hlwords.l);
 		}
 
 		/// Opcode: 0X35, cycles: 12 ( DEC (HL) )
@@ -863,7 +902,7 @@ namespace GBMU_NAMESPACE {
 		operDecPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0XC>(core.regs.hl /* What is pointed by hl */, c);
-			handleFlagsIncWord(core.flags, core.regs.hl /* What is pointed by hl */);
+			handleFlagsDecWord(core.flags, core.regs.hl /* What is pointed by hl */);
 		}
 
 		/// Opcode: 0X3D, cycles: 4 ( DEC A )
@@ -871,7 +910,7 @@ namespace GBMU_NAMESPACE {
 		operDecA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			operBaseDec<0X4>(core.regs.afwords.a, c);
-			handleFlagsIncWord(core.flags, core.regs.afwords.a);
+			handleFlagsDecWord(core.flags, core.regs.afwords.a);
 		}
 
 
@@ -1222,81 +1261,102 @@ namespace GBMU_NAMESPACE {
 
 //
 ///TODO: All p & q have been set, find which one set to operNop
+///TODO: CP opertion & flag
 //
 
 		template <typename Flags, typename T>
 		static inline void
 		handleFlagsOperAdd(Flags& flags, T value)
 		{
-			/** TODO: Flags affected:
+			/** NOTE: Flags affected:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Set if carry from bit 3.
   				C - Set if carry from bit 7.
 			*/
 
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT);
+			if (FGMASK_HAS(flags, Z80Flags::FLAG_CARRY))
+			{
+				if (FGMASK_HAS(flags, MASKBIT3))
+					FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY);
+				if (FGMASK_HAS(flags, MASKBIT7))
+					FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
+			}
 		}
 
 		template <typename Flags, typename T>
 		static inline void
 		handleFlagsOperSub(Flags& flags, T value)
 		{
-			/** TODO: Flags affected:
+			/** NOTE: Flags affected:
 			 	Z - Set if result is zero.
    				N - Reset.
    				H - Set if carry from bit 4.
    				C - Set if carry from bit 7.
 			*/
 
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT);
+			if (FGMASK_HAS(flags, Z80Flags::FLAG_CARRY))
+			{
+				if (FGMASK_HAS(flags, MASKBIT4))
+					FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY);
+				if (FGMASK_HAS(flags, MASKBIT7))
+					FGMASK_ADD(flags, Z80Flags::FLAG_CARRY);
+			}
 		}
 
 		template <typename Flags, typename T>
 		static inline void
 		handleFlagsOperAnd(Flags& flags, T value)
 		{
-			/** TODO: Flags affected:
+			/** NOTE: Flags affected:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Set.
   				C - Reset
 			*/
 
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_CARRY);
+			FGMASK_ADD(flags, Z80Flags::FLAG_HALF_CARRY); ///TODO: Always to this ?
 		}
 
 		template <typename Flags, typename T>
 		static inline void
 		handleFlagsOperXor(Flags& flags, T value)
 		{
-			/** TODO: Flags affected:
+			/** NOTE: Flags affected:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Reset.
 			*/
 
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY | Z80Flags::FLAG_CARRY);
 		}
 
 		template <typename Flags, typename T>
 		static inline void
 		handleFlagsOperOr(Flags& flags, T value)
 		{
-			/** TODO: Flags affected:
+			/** NOTE: Flags affected:
 			 	Z - Set if result is zero.
   				N - Reset.
   				H - Reset.
   				C - Reset.
 			*/
 
-			static_cast<void>(flags);
-			static_cast<void>(value);
+			if (value == 0)
+				FGMASK_ADD(flags, Z80Flags::FLAG_ZERO);
+			FGMASK_DEL(flags, Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY | Z80Flags::FLAG_CARRY);
 		}
 
 		template <typename Flags, typename T>
@@ -1836,7 +1896,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB00, cycles: 8 ( RLC B )
 		static void
 		operRLC_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
 
 		/// Opcode: 0XCB08, cycles: 8 ( RRC B )
 		static void
@@ -1846,7 +1906,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB10, cycles: 8 ( RL B )
 		static void
 		operRL_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.bcwords.b, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.bcwords.b, core.flags, c); }
 
 		/// Opcode: 0XCB18, cycles: 8 ( RR B )
 		static void
@@ -1876,7 +1936,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB01, cycles: 8 ( RLC C )
 		static void
 		operRLC_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
 
 		/// Opcode: 0XCB09, cycles: 8 ( RRC C )
 		static void
@@ -1886,7 +1946,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB11, cycles: 8 ( RL C )
 		static void
 		operRL_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.bcwords.c, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.bcwords.c, core.flags, c); }
 
 		/// Opcode: 0XCB19, cycles: 8 ( RR C )
 		static void
@@ -1916,7 +1976,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB02, cycles: 8 ( RLC D )
 		static void
 		operRLC_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.dewords.d, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.dewords.d, core.flags, c); }
 
 		/// Opcode: 0XCB0A, cycles: 8 ( RRC D )
 		static void
@@ -1926,7 +1986,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB12, cycles: 8 ( RL D )
 		static void
 		operRL_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.dewords.d, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.dewords.d, core.flags, c); }
 
 		/// Opcode: 0XCB1A, cycles: 8 ( RR D )
 		static void
@@ -1956,7 +2016,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB03, cycles: 8 ( RLC E )
 		static void
 		operRLC_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.dewords.e, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.dewords.e, core.flags, c); }
 
 		/// Opcode: 0XCB0B, cycles: 8 ( RRC E )
 		static void
@@ -1966,7 +2026,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB13, cycles: 8 ( RL E )
 		static void
 		operRL_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.dewords.e, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.dewords.e, core.flags, c); }
 
 		/// Opcode: 0XCB1B, cycles: 8 ( RR E )
 		static void
@@ -1996,7 +2056,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB04, cycles: 8 ( RLC H )
 		static void
 		operRLC_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
 
 		/// Opcode: 0XCB0C, cycles: 8 ( RRC H )
 		static void
@@ -2006,7 +2066,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB14, cycles: 8 ( RL H )
 		static void
 		operRL_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.hlwords.h, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.hlwords.h, core.flags, c); }
 
 		/// Opcode: 0XCB1C, cycles: 8 ( RR H )
 		static void
@@ -2036,7 +2096,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB05, cycles: 8 ( RLC L )
 		static void
 		operRLC_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
 
 		/// Opcode: 0XCB0D, cycles: 8 ( RRC L )
 		static void
@@ -2046,7 +2106,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB15, cycles: 8 ( RL L )
 		static void
 		operRL_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.hlwords.l, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.hlwords.l, core.flags, c); }
 
 		/// Opcode: 0XCB1D, cycles: 8 ( RR L )
 		static void
@@ -2076,7 +2136,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB06, cycles: 16 ( RLC (HL) )
 		static void
 		operRLC_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
 
 		/// Opcode: 0XCB0E, cycles: 16 ( RRC (HL) )
 		static void
@@ -2086,7 +2146,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB16, cycles: 16 ( RL (HL) )
 		static void
 		operRL_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		{ operBaseRotateLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
 
 		/// Opcode: 0XCB1E, cycles: 16 ( RR (HL) )
 		static void
@@ -2116,7 +2176,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB07, cycles: 8 ( RLC A )
 		static void
 		operRLC_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelfCarry<0X8>(core.regs.afwords.a, core.flags, c); }
+		{ operBaseRotateLeftCarry<0X8>(core.regs.afwords.a, core.flags, c); }
 
 
 		/// Opcode: 0XCB0F, cycles: 8 ( RRC A )
@@ -2127,7 +2187,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCB17, cycles: 8 ( RL A )
 		static void
 		operRL_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLelf<0X8>(core.regs.afwords.a, core.flags, c); }
+		{ operBaseRotateLeft<0X8>(core.regs.afwords.a, core.flags, c); }
 
 		/// Opcode: 0XCB1F, cycles: 8 ( RR A )
 		static void
