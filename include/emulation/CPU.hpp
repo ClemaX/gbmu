@@ -81,6 +81,7 @@ namespace GBMU_NAMESPACE {
 		int8_t			getPrefixFamily() const { return this->prefixFamily; }
 		const opcode_byte_t*	getParamAddr() const { return this->opcodeAddr + this->bytesSize; }
 		const opcode_byte_t*	getNextOpcode() const { return this->getParamAddr() + this->paramSize; }
+		size_t 			getTotalSize() const { return this->bytesSize + this->paramSize; }
 
 		int8_t		getDisplacement()
 		{
@@ -683,7 +684,7 @@ namespace GBMU_NAMESPACE {
 		}
 		///TODO: functions calling this can set MSB to 0 or not change its value.
 
-		template <typename T, class Mem, typename Flags, int64_t cycles = 16>
+		template <typename T, class Mem, int64_t cycles = 16>
 		static inline void
 		__attribute__ ((always_inline))
 		operBasePush(T src, T& rsp, Mem mem, Chrono& c)
@@ -698,7 +699,7 @@ namespace GBMU_NAMESPACE {
 			c.setCycles(cycles);
 		}
 
-		template <typename T, class Mem, typename Flags, int64_t cycles = 12>
+		template <typename T, class Mem, int64_t cycles = 12>
 		static inline void
 		__attribute__ ((always_inline))
 		operBasePop(T& dest, T& rsp, Mem mem, Chrono& c)
@@ -711,10 +712,45 @@ namespace GBMU_NAMESPACE {
 			c.setCycles(cycles);
 		}
 
+		template <typename T, int64_t cycles = 12>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseAbsoluteJump(T jumpTo, T& rcp, Chrono& c)
+		noexcept
+		{
+			rcp = jumpTo;
+			c.setCycles(cycles);
+		}
 
+		template <typename T, int64_t cycles = 12>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseAbsoluteConditionalJump(T jumpTo, T& rcp, bool cond, Chrono& c)
+		noexcept
+		{
+			if (cond)
+				operBaseAbsoluteJump(jumpTo, rcp, c);
+		}
 
+		template <typename T, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRelativeJump(T jumpTo, T& rcp, Chrono& c)
+		noexcept
+		{
+			rcp += static_cast<uint16_t>(jumpTo);
+			c.setCycles(cycles);
+		}
 
-
+		template <typename T, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRelativeConditionalJump(T jumpTo, T& rcp, bool cond, Chrono& c)
+		noexcept
+		{
+			if (cond)
+				operBaseRelativeJump(jumpTo, rcp, c);
+		}
 
 
 
@@ -727,12 +763,52 @@ namespace GBMU_NAMESPACE {
 		// Operations function pointers //
 		//////////////////////////////////
 
-		/// Opcode 0x0 + all ignored instructions
-		static void OperNop(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		/// Opcode: 0x0 + all ignored instructions
+		static void
+		OperNop(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
 			static_cast<void>(op);
 			operInlNop(core, c);
 		}
+
+		/////////////////////////////
+		// RELATIVE JUMP OPERATION //
+		/////////////////////////////
+
+//
+///TODO: No Q & P, find the exact spot to place them with opcode value
+//
+		/// Opcode: 0X18, cycles: 8
+		static void
+		operJr(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseRelativeJump<0X8>(op.getImmediateData8b(), core.regs.cp, c); }
+
+		/////////////////////////////////////////
+		// CONDITIONAL RELATIVE JUMP OPERATION //
+		/////////////////////////////////////////
+
+//
+///TODO: No Q & P, find the exact spot to place them with opcode value
+//
+		/// Opcode: 0X20, cycles: 8 ( JR NZ )
+		static void
+		operJr_NZ(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseRelativeConditionalJump<0X8>(op.getImmediateData8b(), core.regs.cp, !FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c); }
+
+		/// Opcode: 0X28, cycles: 8 ( JR N )
+		static void
+		operJr_N(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseRelativeConditionalJump<0X8>(op.getImmediateData8b(), core.regs.cp, FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c); }
+
+		/// Opcode: 0X30, cycles: 8 ( JR NC )
+		static void
+		operJr_NC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseRelativeConditionalJump<0X8>(op.getImmediateData8b(), core.regs.cp, !FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c); }
+
+		/// Opcode: 0X28, cycles: 8 ( JR C )
+		static void
+		operJr_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseRelativeConditionalJump<0X8>(op.getImmediateData8b(), core.regs.cp, FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c); }
 
 		/////////////////////////////
 		// 16 BIT LOADS OPERATIONS //
@@ -2408,6 +2484,44 @@ namespace GBMU_NAMESPACE {
 			static_cast<void>(op);
 			operBasePop<0XC>(core.regs.af, core.regs.sp, core.memory, c);
 		}
+
+		//////////////////////////////////////////
+		// CONDITIONAL ABSOLUTE JUMP OPERATIONS //
+		//////////////////////////////////////////
+//
+///TODO: Select wicth Q & P use ( others should be nop )
+//
+		/// Opcode: 0XC2, cycles: 12 ( JP NZ, nn )
+		static void
+		operJp_NZ(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseAbsoluteConditionalJump<0X8>(op.getImmediateData16b(), core.regs.cp, !FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c); }
+
+		/// Opcode: 0XCA, cycles: 12 ( JP Z, nn )
+		static void
+		operJp_Z(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseAbsoluteConditionalJump<0X8>(op.getImmediateData16b(), core.regs.cp, FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c); }
+
+		/// Opcode: 0XD2, cycles: 12 ( JP NC, nn )
+		static void
+		operJp_NC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseAbsoluteConditionalJump<0X8>(op.getImmediateData16b(), core.regs.cp, !FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c); }
+
+		/// Opcode: 0XDA, cycles: 12 ( JP C, nn )
+		static void
+		operJp_N(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseAbsoluteConditionalJump<0XC>(op.getImmediateData16b(), core.regs.cp, FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c); }
+
+		//////////////////////////////
+		// ABSOLUTE JUMP OPERTATION //
+		//////////////////////////////
+
+//
+///TODO: Select wicth Q & P use ( others should be nop )
+//
+		/// Opcode: 0XC3, cycles: 12 ( JP nn )
+		static void
+		OperJp(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseAbsoluteJump<0XC>(op.getImmediateData16b(), core.regs.cp, c); }
 
 		/////////////////////
 		// PUSH OPERATIONS //
@@ -4642,24 +4756,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr,
 								/* P = 1 */
-								&OperNop,
+								&operJr,
 								/* P = 2 */
-								&OperNop,
+								&operJr,
 								/* P = 3 */
-								&OperNop
+								&operJr
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr,
 								/* P = 1 */
-								&OperNop,
+								&operJr,
 								/* P = 2 */
-								&OperNop,
+								&operJr,
 								/* P = 3 */
-								&OperNop
+								&operJr
 							}
 						},
 						/* Y = 4 */
@@ -4667,24 +4781,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 3 */
-								&OperNop
+								&operJr_NZ
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operJr_NZ,
 								/* P = 3 */
-								&OperNop
+								&operJr_NZ
 							}
 						},
 						/* Y = 5 */
@@ -4692,24 +4806,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_N,
 								/* P = 1 */
-								&OperNop,
+								&operJr_N,
 								/* P = 2 */
-								&OperNop,
+								&operJr_N,
 								/* P = 3 */
-								&OperNop
+								&operJr_N
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_N,
 								/* P = 1 */
-								&OperNop,
+								&operJr_N,
 								/* P = 2 */
-								&OperNop,
+								&operJr_N,
 								/* P = 3 */
-								&OperNop
+								&operJr_N
 							}
 						},
 						/* Y = 6 */
@@ -4717,24 +4831,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 1 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 2 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 3 */
-								&OperNop
+								&operJr_NC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 1 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 2 */
-								&OperNop,
+								&operJr_NC,
 								/* P = 3 */
-								&OperNop
+								&operJr_NC
 							}
 						},
 						/* Y = 7 */
@@ -4742,24 +4856,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_C,
 								/* P = 1 */
-								&OperNop,
+								&operJr_C,
 								/* P = 2 */
-								&OperNop,
+								&operJr_C,
 								/* P = 3 */
-								&OperNop
+								&operJr_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJr_C,
 								/* P = 1 */
-								&OperNop,
+								&operJr_C,
 								/* P = 2 */
-								&OperNop,
+								&operJr_C,
 								/* P = 3 */
-								&OperNop
+								&operJr_C
 							}
 						}
 					},
@@ -9854,24 +9968,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 3 */
-								&OperNop
+								&operJp_NZ
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operJp_NZ,
 								/* P = 3 */
-								&OperNop
+								&operJp_NZ
 							}
 						},
 						/* Y = 1 */
@@ -9879,24 +9993,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 1 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 2 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 3 */
-								&OperNop
+								&operJp_Z
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 1 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 2 */
-								&OperNop,
+								&operJp_Z,
 								/* P = 3 */
-								&OperNop
+								&operJp_Z
 							}
 						},
 						/* Y = 2 */
@@ -9904,24 +10018,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 1 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 2 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 3 */
-								&OperNop
+								&operJp_NC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 1 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 2 */
-								&OperNop,
+								&operJp_NC,
 								/* P = 3 */
-								&OperNop
+								&operJp_NC
 							}
 						},
 						/* Y = 3 */
@@ -9929,24 +10043,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_N,
 								/* P = 1 */
-								&OperNop,
+								&operJp_N,
 								/* P = 2 */
-								&OperNop,
+								&operJp_N,
 								/* P = 3 */
-								&OperNop
+								&operJp_N
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operJp_N,
 								/* P = 1 */
-								&OperNop,
+								&operJp_N,
 								/* P = 2 */
-								&OperNop,
+								&operJp_N,
 								/* P = 3 */
-								&OperNop
+								&operJp_N
 							}
 						},
 						/* Y = 4 */
@@ -10057,24 +10171,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&OperJp,
 								/* P = 1 */
-								&OperNop,
+								&OperJp,
 								/* P = 2 */
-								&OperNop,
+								&OperJp,
 								/* P = 3 */
-								&OperNop
+								&OperJp
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&OperJp,
 								/* P = 1 */
-								&OperNop,
+								&OperJp,
 								/* P = 2 */
-								&OperNop,
+								&OperJp,
 								/* P = 3 */
-								&OperNop
+								&OperJp
 							}
 						},
 						/* Y = 1 */
@@ -49944,6 +50058,8 @@ namespace GBMU_NAMESPACE {
 			{
 				Opcode op(raw);
 				this->executeOperation(op);
+				/// TODO: Those 2 next lines don't work for JUMPS !!!
+				this->regs.cp += op.getTotalSize();
 				raw = op.getNextOpcode();
 			}
 		}
