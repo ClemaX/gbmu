@@ -53,15 +53,14 @@ namespace GBMU_NAMESPACE {
         Opcode();
 
         typedef int32_t opcode_t;
-		typedef int8_t	opcode_byte_t;
+		typedef uint8_t	opcode_byte_t;
 
-		opcode_t		prefixedValue;
-		opcode_byte_t	unprefixedValue;
-		int8_t			prefixFamily;
-
-		struct OpcodeInitializerException
-		: public std::exception
-		{ const char* what() const noexcept { return OPCODE_ERROR_INIT; } };
+		opcode_t				prefixedValue;
+		opcode_byte_t			unprefixedValue;
+		int8_t					prefixFamily;
+		const opcode_byte_t*	opcodeAddr;
+		size_t					bytesSize;
+		size_t					paramSize;
 
         public:
 
@@ -80,6 +79,30 @@ namespace GBMU_NAMESPACE {
 		opcode_byte_t	getP() const { return this->unprefixedValue & PREFIX_PMASK; }
 		opcode_byte_t	getQ() const { return this->unprefixedValue & PREFIX_QMASK; }
 		int8_t			getPrefixFamily() const { return this->prefixFamily; }
+		const opcode_byte_t*	getParamAddr() const { return this->opcodeAddr + this->bytesSize; }
+		const opcode_byte_t*	getNextOpcode() const { return this->getParamAddr() + this->paramSize; }
+
+		int8_t		getDisplacement()
+		{
+			this->paramSize++;
+			return *this->getParamAddr();
+		}
+
+		uint8_t	getImmediateData8b()
+		{
+			const uint8_t res = *this->getNextOpcode();
+			this->paramSize++;
+			return res;
+		}
+
+		uint16_t getImmediateData16b()
+		{
+			const uint16_t res = *reinterpret_cast<const uint16_t*>(this->getNextOpcode());
+			this->paramSize += 2;
+			return res;
+		}
+
+		void			setParamSize(size_t size) { this->paramSize = size; }
 
 		// TODO: Wait a minute ... This return true in all the cases !!!
 		bool			isValid() const
@@ -93,38 +116,46 @@ namespace GBMU_NAMESPACE {
 			);
 		}
 
-		Opcode(opcode_t opcode)
-		: prefixedValue(opcode),
-		unprefixedValue(static_cast<opcode_byte_t>(opcode))
+		// [ prefix 8b ] [ opcode 8b ] [ d 8b ] [ n-nn 8-16b ]
+
+		Opcode(const opcode_byte_t* startAddr)
+		: opcodeAddr(startAddr), paramSize()
 		{
-			/// TODO: Check if i shift the right amount
-			switch (static_cast<uint16_t>(opcode >> 16))
+			switch (*startAddr)
 			{
 				case 0XCB:
 					this->prefixFamily = PREFIX_CB;
+					this->prefixedValue = (0XFFFF0000 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 16;
 					break ;
 				case 0XED:
 					this->prefixFamily = PREFIX_ED;
+					this->prefixedValue = (0XFFFF0000 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 16;
 					break ;
 				case 0XDD:
 					this->prefixFamily = PREFIX_DD;
+					if (*(++startAddr) == 0XCB)
+					{
+						this->prefixFamily |= PREFIX_CB;
+						this->prefixedValue = (0XFFFFFF00 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 8;
+					}
+					else
+						this->prefixedValue = (0XFFFF0000 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 16;
 					break ;
 				case 0XFD:
 					this->prefixFamily = PREFIX_FD;
+					if (*(++startAddr) == 0XCB)
+					{
+						this->prefixFamily |= PREFIX_CB;
+						this->prefixedValue = (0XFFFFFF00 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 8;
+					}
+					else
+						this->prefixedValue = (0XFFFF0000 & *reinterpret_cast<const opcode_t*>(this->opcodeAddr)) >> 16;
 					break ;
-				case (0XDD << 8) | 0XCB:
-					this->prefixFamily = PREFIX_DD | PREFIX_CB;
-					break ;
-				case (0XFD << 8) | 0xDB:
-					this->prefixFamily = PREFIX_FD | PREFIX_CB;
-					break ;
-				case 0x0:
-					this->prefixFamily = UNPREFIXED;
-					break ;
-
 				default:
-					throw OpcodeInitializerException();
+					this->prefixFamily = UNPREFIXED;
 			}
+			this->unprefixedValue = *(++startAddr);
+			this->bytesSize = startAddr - opcodeAddr;
 		}
 
 		~Opcode() { }
@@ -251,7 +282,7 @@ namespace GBMU_NAMESPACE {
 		typedef Flags		flags_t;
 
 		typedef CPU<mem_t, reg_t, flags_t> cpu_t;
-		typedef void (*exeOpcode_t)(const cpu_t& core, Chrono& c);
+		typedef void (*exeOpcode_t)(cpu_t& core, Chrono& c);
 
 		mem_t	memory;
 		reg_t	regs;
@@ -354,6 +385,10 @@ namespace GBMU_NAMESPACE {
 			}
 		}
 
+		//////////////////////////////////////////////////////////////////////////
+		// Base Operations (almost all operation's function pointer call those) //
+		//////////////////////////////////////////////////////////////////////////
+
 		template <typename T, int64_t cycles>
 		__attribute__ ((always_inline))
 		static inline void
@@ -387,7 +422,7 @@ namespace GBMU_NAMESPACE {
 		template <int64_t cycles = 4>
 		static inline void
 		__attribute__ ((always_inline))
-		operInlNop(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operInlNop(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
 		{
 			static_cast<void>(core);
 			c.setCycles(cycles);
@@ -648,13 +683,26 @@ namespace GBMU_NAMESPACE {
 		}
 		///TODO: functions calling this can set MSB to 0 or not change its value.
 
+
+
+
+
+
+
+
+
+
+
 		//////////////////////////////////
 		// Operations function pointers //
 		//////////////////////////////////
 
 		/// Opcode 0x0 + all ignored instructions
-		static void OperNop(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		static void OperNop(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/////////////////////////////
 		// 16 BIT LOADS OPERATIONS //
@@ -665,23 +713,35 @@ namespace GBMU_NAMESPACE {
 //
 		/// Opcode 0X02, cycles: 8 ( LD (BC), A )
 		static void
-		operLD_AinPAddrBC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(/* memory at this addr */core.regs.bc, static_cast<udword_t>(core.regs.afwords.a, c)); }
+		operLD_AinPAddrBC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(/* memory at this addr */core.regs.bc, static_cast<udword_t>(core.regs.afwords.a, c));
+		}
 
 		/// Opcode 0X12, cycles: 8 ( LD (DE), A )
 		static void
-		operLD_AinPAddrDE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(/* memory at this addr */core.regs.de, static_cast<udword_t>(core.regs.afwords.a, c)); }
+		operLD_AinPAddrDE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(/* memory at this addr */core.regs.de, static_cast<udword_t>(core.regs.afwords.a, c));
+		}
 
 		/// Opcode 0X0A, cycles: 8 ( LD A, (BC) )
 		static void
-		operLD_PAdrrBCinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.afwords.a, /* value at the memory at this addr */core.regs.bc, c); }
+		operLD_PAdrrBCinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.afwords.a, /* value at the memory at this addr */core.regs.bc, c);
+		}
 
 		/// Opcode 0X1A, cycles: 8 ( LD A, (DE) )
 		static void
-		operLD_PAdrrDEinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.afwords.a, /* value at the memory at this addr */core.regs.de, c); }
+		operLD_PAdrrDEinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.afwords.a, /* value at the memory at this addr */core.regs.de, c);
+		}
 
 		/// Opcode: ? ( LD (nn), HL )
 
@@ -700,43 +760,67 @@ namespace GBMU_NAMESPACE {
 //
 		/// Opcode: 0X3, cycles: 8 ( INC BC )
 		static void
-		operIncBC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseInc<0X8>(core.regs.bc, c); }
+		operIncBC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseInc<0X8>(core.regs.bc, c);
+		}
 
 		/// Opcode: 0X13, cycles: 8 ( INC DE )
 		static void
-		operIncDE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseInc<0X8>(core.regs.de, c); }
+		operIncDE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseInc<0X8>(core.regs.de, c);
+		}
 
 		/// Opcode: 0X23, cycles: 8 ( INC HL )
 		static void
-		operIncHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseInc<0X8>(core.regs.hl, c); }
+		operIncHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseInc<0X8>(core.regs.hl, c);
+		}
 
 		/// Opcode: 0X33, cycles: 8 ( INC SP )
 		static void
-		operIncSP(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseInc<0X8>(core.regs.af, c); }
+		operIncSP(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseInc<0X8>(core.regs.af, c);
+		}
 
 		/// Opcode: 0X0B, cycles: 8 ( DEC BC )
 		static void
-		operDecBC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseDec<0X8>(core.regs.bc, c); }
+		operDecBC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseDec<0X8>(core.regs.bc, c);
+		}
 
 		/// Opcode: 0X1B, cycles: 8 ( DEC DE )
 		static void
-		operDecDE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseDec<0X8>(core.regs.de, c); }
+		operDecDE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseDec<0X8>(core.regs.de, c);
+		}
 
 		/// Opcode: 0X2B, cycles: 8 ( DEC HL )
 		static void
-		operDecHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseDec<0X8>(core.regs.hl, c); }
+		operDecHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseDec<0X8>(core.regs.hl, c);
+		}
 
 		/// Opcode: 0X3B, cycles: 8 ( DEC SP )
 		static void
-		operDecSP(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseDec<0X8>(core.regs.af, c); }
+		operDecSP(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseDec<0X8>(core.regs.af, c);
+		}
 
 
 		////////////////////////////////////
@@ -787,128 +871,144 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0X04, cycles: 4 ( INC B )
 		static void
-		operIncB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.bcwords.b, c);
 			handleFlagsIncWord(core.flags, core.regs.bcwords.b);
 		}
 
 		/// Opcode: 0X0C, cycles: 4 ( INC C )
 		static void
-		operIncC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.bcwords.c, c);
 			handleFlagsIncWord(core.flags, core.regs.bcwords.c);
 		}
 
 		/// Opcode: 0X14, cycles: 4 ( INC D )
 		static void
-		operIncD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.dewords.d, c);
 			handleFlagsIncWord(core.flags, core.regs.dewords.d);
 		}
 
 		/// Opcode: 0X1C, cycles: 4 ( INC E )
 		static void
-		operIncE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.dewords.e, c);
 			handleFlagsIncWord(core.flags, core.regs.dewords.e);
 		}
 
 		/// Opcode: 0X24, cycles: 4 ( INC H )
 		static void
-		operIncH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.hlwords.h, c);
 			handleFlagsIncWord(core.flags, core.regs.hlwords.h);
 		}
 
 		/// Opcode: 0X2C, cycles: 4 ( INC L )
 		static void
-		operIncL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.hlwords.l, c);
 			handleFlagsIncWord(core.flags,core.regs.hlwords.l);
 		}
 
 		/// Opcode: 0X34, cycles: 12 ( INC (HL) )
 		static void
-		operIncPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0XC>(core.regs.hl /* What is pointed by hl */, c);
 			handleFlagsIncWord(core.flags, core.regs.hl /* What is pointed by hl */);
 		}
 
 		/// Opcode: 0X3C, cycles: 4 ( INC A )
 		static void
-		operIncA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operIncA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseInc<0X4>(core.regs.afwords.a, c);
 			handleFlagsIncWord(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X05, cycles: 4 ( DEC B )
 		static void
-		operDecB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.bcwords.b, c);
 			handleFlagsDecWord(core.flags, core.regs.bcwords.b);
 		}
 
 		/// Opcode: 0X0D, cycles: 4 ( DEC C )
 		static void
-		operDecC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.bcwords.c, c);
 			handleFlagsDecWord(core.flags, core.regs.bcwords.c);
 		}
 
 		/// Opcode: 0X15, cycles: 4 ( DEC D )
 		static void
-		operDecD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.dewords.d, c);
 			handleFlagsDecWord(core.flags, core.regs.dewords.d);
 		}
 
 		/// Opcode: 0X1D, cycles: 4 ( DEC E )
 		static void
-		operDecE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.dewords.e, c);
 			handleFlagsDecWord(core.flags, core.regs.dewords.e);
 		}
 
 		/// Opcode: 0X25, cycles: 4 ( DEC H )
 		static void
-		operDecH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.hlwords.h, c);
 			handleFlagsDecWord(core.flags, core.regs.hlwords.h);
 		}
 
 		/// Opcode: 0X2D, cycles: 4 ( DEC L )
 		static void
-		operDecL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.hlwords.l, c);
 			handleFlagsDecWord(core.flags, core.regs.hlwords.l);
 		}
 
 		/// Opcode: 0X35, cycles: 12 ( DEC (HL) )
 		static void
-		operDecPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0XC>(core.regs.hl /* What is pointed by hl */, c);
 			handleFlagsDecWord(core.flags, core.regs.hl /* What is pointed by hl */);
 		}
 
 		/// Opcode: 0X3D, cycles: 4 ( DEC A )
 		static void
-		operDecA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDecA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseDec<0X4>(core.regs.afwords.a, c);
 			handleFlagsDecWord(core.flags, core.regs.afwords.a);
 		}
@@ -923,23 +1023,35 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0X07, cycles: 4 ( RLCA )
 		static void
-		operRLCA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X4>(core.regs.afwords.a, core.flags, c); }
+		operRLCA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X4>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0X0F, cycles: 4 ( RRCA )
 		static void
-		operRRCA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X4>(core.regs.afwords.a, core.flags, c); }
+		operRRCA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X4>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0X17, cycles: 4 ( RLA )
 		static void
-		operRLA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X4>(core.regs.afwords.a, core.flags, c); }
+		operRLA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X4>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0X1F, cycles: 4 ( RRA )
 		static void
-		operRRA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X4>(core.regs.afwords.a, core.flags, c); }
+		operRRA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X4>(core.regs.afwords.a, core.flags, c);
+		}
 
 		//////////////////////////////
 		// MISCELLEANOUS OPERATIONS //
@@ -952,11 +1064,13 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0x27, cycles: 4 ( DAA )
 		static void
-		operDAA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operDAA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
-			typedef typename CPU<Memory, Z80Registers, uint8_t>::word_t word_t;
+			static_cast<void>(op);
 
-			word_t& a = core.regs.afwords.a;
+			typedef typename CPU<Memory, Z80Registers, uint8_t>::uword_t uword_t;
+
+			uword_t& a = core.regs.afwords.a;
 
 			if (FGMASK_HAS(core.flags, Z80Flags::FLAG_HALF_CARRY) || (a & 0X0F) > 9)
 				a += FGMASK_HAS(core.flags, Z80Flags::FLAG_SUBSTRACT) ? -6 : 6;
@@ -970,11 +1084,13 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0x2F, cycles: 4 ( CPL )
 		static void
-		operCPL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCPL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
-			typedef typename CPU<Memory, Z80Registers, uint8_t>::word_t word_t;
+			static_cast<void>(op);
 
-			word_t& a = core.regs.afwords.a;
+			typedef typename CPU<Memory, Z80Registers, uint8_t>::uword_t uword_t;
+
+			uword_t& a = core.regs.afwords.a;
 
 			a = ~a;
 			FGMASK_ADD(core.flags, Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY);
@@ -983,8 +1099,10 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0x3F, cycles: 4 ( SCF )
 		static void
-		operSCF(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSCF(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
+
 			FGMASK_ADD(core.flags, Z80Flags::FLAG_CARRY);
 			FGMASK_DEL(core.flags, Z80Flags::FLAG_SUBSTRACT | Z80Flags::FLAG_HALF_CARRY);
 			c.setCycles(4);
@@ -992,8 +1110,10 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0x37, cycles: 4 ( CCF )
 		static void
-		operCCF(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCCF(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
+
 			if (FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY))
 				FGMASK_DEL(core.flags, Z80Flags::FLAG_CARRY);
 			else
@@ -1012,323 +1132,515 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0X40, cycles: 4 ( LD B, B )
 		static void
-		operLD_BinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_BinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/// Opcode: 0X48, cycles: 4 ( LD C, B )
 		static void
-		operLD_BinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.c, core.regs.bcwords.b, c); }
+		operLD_BinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.c, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0X50, cycles: 4 ( LD D, B )
 		static void
-		operLD_BinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.d, core.regs.bcwords.b, c); }
+		operLD_BinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.d, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0X58, cycles: 4 ( LD E, B )
 		static void
-		operLD_BinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.e, core.regs.bcwords.b, c); }
+		operLD_BinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.e, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0X60, cycles: 4 ( LD H, B )
 		static void
-		operLD_BinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.h, core.regs.bcwords.b, c); }
+		operLD_BinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.h, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0x68, cycles: 4 ( LD L, B )
 		static void
-		operLD_BinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.l, core.regs.bcwords.b, c); }
+		operLD_BinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.l, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0X70, cycles: 8 ( LD (HL), B )
 		static void
-		operLD_BinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.b, c)); }
+		operLD_BinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.b, c));
+		}
 
 		/// Opcode: 0X78, cycles: 4 ( LD A, B )
 		static void
-		operLD_BinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, core.regs.bcwords.b, c); }
+		operLD_BinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, core.regs.bcwords.b, c);
+		}
 
 		/// Opcode: 0X41, cycles: 4 ( LD B, C )
 		static void
-		operLD_CinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.bcwords.c, c); }
+		operLD_CinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X49, cycles: 4 ( LD C, C )
 		static void
-		operLD_CinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_CinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/// Opcode: 0x4A, cycles: 4 ( LD D, C )
 		static void
-		operLD_CinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.d, core.regs.bcwords.c, c); }
+		operLD_CinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.d, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X59, cycles: 4  ( LD E, C )
 		static void
-		operLD_CinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.e, core.regs.bcwords.c, c); }
+		operLD_CinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.e, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X61, cycles: 4 ( LD H, C )
 		static void
-		operLD_CinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.h, core.regs.bcwords.c, c); }
+		operLD_CinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.h, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X69, cycles: 4 ( LD L, C )
 		static void
-		operLD_CinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.l, core.regs.bcwords.c, c); }
+		operLD_CinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.l, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X71, cycles: 8 ( LD (HL), C )
 		static void
-		operLD_CinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.c, c)); }
+		operLD_CinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.bcwords.c, c));
+		}
 
 		/// Opcode: 0X79, cycles:4 ( LD A, C )
 		static void
-		operLD_CinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c); }
+		operLD_CinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
+		}
 
 		/// Opcode: 0X42, cycles: 4 ( LD B, D )
 		static void
-		operLD_DinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.d, c); }
+		operLD_DinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X4A, cycles: 4 ( LD C, D )
 		static void
-		operLD_DinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.d, c); }
+		operLD_DinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X52, cycles: 4 ( LD D, D )
 		static void
-		operLD_DinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_DinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/// Opcode: 0X5A, cycles: 4 ( LD E, D )
 		static void
-		operLD_DinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.e, core.regs.dewords.d, c); }
+		operLD_DinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.e, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X62, cycles: 4 ( LD H, D )
 		static void
-		operLD_DinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.h, core.regs.dewords.d, c); }
+		operLD_DinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.h, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X6A, cycles: 4 ( LD L, D )
 		static void
-		operLD_DinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.l, core.regs.dewords.d, c); }
+		operLD_DinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.l, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X72, cycles: 8 ( LD (HL), D )
 		static void
-		operLD_DinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.d), c); }
+		operLD_DinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.d), c);
+		}
 
 		/// Opcode: 0X7A, cycles: 4 ( LD A, D )
 		static void
-		operLD_DinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, core.regs.dewords.d, c); }
+		operLD_DinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, core.regs.dewords.d, c);
+		}
 
 		/// Opcode: 0X43, cycles: 4 ( LD B, E )
 		static void
-		operLD_EinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.e, c); }
+		operLD_EinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X4B, cycles: 4 ( LD C, E )
 		static void
-		operLD_EinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.e, c); }
+		operLD_EinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X53, cycles: 4 ( LD D, E )
 		static void
-		operLD_EinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.d, core.regs.dewords.e, c); }
+		operLD_EinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.d, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X5B, cycles: 4 ( LD E, E )
 		static void
-		operLD_EinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_EinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/// Opcode: 0X63, cycles: 4 ( LD H, E )
 		static void
-		operLD_EinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.h, core.regs.dewords.e, c); }
+		operLD_EinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.h, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X6B, cycles: 4 ( LD L, E )
 		static void
-		operLD_EinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.l, core.regs.dewords.e, c); }
+		operLD_EinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.l, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X73, cycles: 8 ( LD (HL), E )
 		static void
-		operLD_EinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.e), c); }
+		operLD_EinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.dewords.e), c);
+		}
 
 		/// Opcode: 0X7B, cycles: 4 ( LD A, E )
 		static void
-		operLD_EinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, core.regs.dewords.e, c); }
+		operLD_EinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, core.regs.dewords.e, c);
+		}
 
 		/// Opcode: 0X44, cycles: 4 ( LD B, H )
 		static void
-		operLD_HinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.h, c); }
+		operLD_HinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X4C, cycles: 4 ( LD C, H )
 		static void
-		operLD_HinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.h, c); }
+		operLD_HinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X54, cycles: 4 ( LD D, H )
 		static void
-		operLD_HinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.d, core.regs.hlwords.h, c); }
+		operLD_HinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.d, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X5C, cycles: 4 ( LD E, H )
 		static void
-		operLD_HinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.e, core.regs.hlwords.h, c); }
+		operLD_HinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.e, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X64, cycles: 4 ( LD H, H )
 		static void
-		operLD_HinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_HinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		/// Opcode: 0X6C, cycles: 4 ( LD L, H )
 		static void
-		operLD_HinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.l, core.regs.hlwords.h, c); }
+		operLD_HinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.l, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X74, cycles: 8 ( LD (HL), H )
 		static void
-		operLD_HinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.h, c)); }
+		operLD_HinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.h, c));
+		}
 
 		/// Opcode: 0X7C,  cycles: 4 ( LD A, H )
 		static void
-		operLD_HinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, core.regs.hlwords.h, c); }
+		operLD_HinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, core.regs.hlwords.h, c);
+		}
 
 		/// Opcode: 0X45, cycles: 4 ( LD B, L )
 		static void
-		operLD_LinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.l, c); }
+		operLD_LinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X4D, cycles: 4 ( LD C, L )
 		static void
-		operLD_LinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.l, c); }
+		operLD_LinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.bcwords.b, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X55, cycles: 4 ( LD D, L )
 		static void
-		operLD_LinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.d, core.regs.hlwords.l, c); }
+		operLD_LinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.d, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X5D, cycles: 4 ( LD E, L )
 		static void
-		operLD_LinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.dewords.e, core.regs.hlwords.l, c); }
+		operLD_LinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.dewords.e, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X65, cycles: 4 ( LD H, L )
 		static void
-		operLD_LinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X4>(core.regs.hlwords.h, core.regs.hlwords.l, c); }
+		operLD_LinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X4>(core.regs.hlwords.h, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X6D, cycles: 4 ( LD L, L )
 		static void
-		operLD_LinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop<0X4>(core, c); }
+		operLD_LinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop<0X4>(core, c);
+		}
 
 		/// Opcode: 0X75, cycles: 8 ( LD (HL), L )
 		static void
-		operLD_LinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.l), c); }
+		operLD_LinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.hlwords.l), c);
+		}
 
 		/// Opcode: 0X7D, cycles: 4 ( LD A, L )
 		static void
-		operLD_LinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, core.regs.hlwords.l, c); }
+		operLD_LinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, core.regs.hlwords.l, c);
+		}
 
 		/// Opcode: 0X46, cycles: 8 ( LD B, (HL) )
 		static void
-		operLD_PAddrHLinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */), c); }
+		operLD_PAddrHLinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */), c);
+		}
 
 		/// Opcode: 0X4E, cycles: 8 ( LD C, (HL) )
 		static void
-		operLD_PAddrHLinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */), c); }
+		operLD_PAddrHLinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.bcwords.b, static_cast<udword_t>(core.regs.hl /* The value poited by */), c);
+		}
 
 		/// Opcode: 0X56, cycles: 8 ( LD D, (HL) )
 		static void
-		operLD_PAddrHLinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.dewords.d, static_cast<udword_t>(core.regs.hl /* The value poited by */), c); }
+		operLD_PAddrHLinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.dewords.d, static_cast<udword_t>(core.regs.hl /* The value poited by */), c);
+		}
 
 		/// Opcode: 0X5E, cycles: 8 ( LD E, (HL) )
 		static void
-		operLD_PAddrHLinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.dewords.e, static_cast<udword_t>(core.regs.hl /* The value poited by */), c); }
+		operLD_PAddrHLinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.dewords.e, static_cast<udword_t>(core.regs.hl /* The value poited by */), c);
+		}
 
 		/// Opcode: 0X66, cycles: 8 ( LD H, (HL) )
 		static void
-		operLD_PAddrHLinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hlwords.h, static_cast<udword_t>(core.regs.hl/* The value poited by */), c); }
+		operLD_PAddrHLinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hlwords.h, static_cast<udword_t>(core.regs.hl/* The value poited by */), c);
+		}
 
 		/// Opcode: 0X6E, cycles: 8 ( LD L, (HL) )
 		static void
-		operLD_PAddrHLinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0X8>(core.regs.hlwords.l, static_cast<udword_t>(core.regs.hl/* The value poited by */), c); }
+		operLD_PAddrHLinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0X8>(core.regs.hlwords.l, static_cast<udword_t>(core.regs.hl/* The value poited by */), c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( LD (HL), (HL) ) // may be 0X76
 		static void
-		operLD_PAddrHLinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop<0X8>(core, c); }
+		operLD_PAddrHLinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop<0X8>(core, c);
+		}
 
 		/// Opcode: 0X7E, cycles: 8 ( LD A, (HL) )
 		static void
-		operLD_PAddrHLinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.afwords.a, static_cast<udword_t>(core.regs.hl /* The value poited by */), c); }
+		operLD_PAddrHLinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.afwords.a, static_cast<udword_t>(core.regs.hl /* The value poited by */), c);
+		}
 
 		/// Opcode: 0X47, cycles: 4 ( LD B, A )
 		static void
-		operLD_AinB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.bcwords.b, core.regs.afwords.a, c); }
+		operLD_AinB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.bcwords.b, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X4F, cycles: 4 ( LD C, A )
 		static void
-		operLD_AinC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.bcwords.b, core.regs.afwords.a, c); }
+		operLD_AinC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.bcwords.b, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X57, cycles: 4 ( LD D, A )
 		static void
-		operLD_AinD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.dewords.d, core.regs.afwords.a, c); }
+		operLD_AinD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.dewords.d, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X5F, cycles: 4 ( LD E, A )
 		static void
-		operLD_AinE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.dewords.e, core.regs.afwords.a, c); }
+		operLD_AinE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.dewords.e, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X67, cycles: 4 ( LD H, A )
 		static void
-		operLD_AinH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.hlwords.h, core.regs.afwords.a, c); }
+		operLD_AinH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.hlwords.h, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X6F, cycles: 4 ( LD L, A )
 		static void
-		operLD_AinL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x4>(core.regs.hlwords.l, core.regs.afwords.a, c); }
+		operLD_AinL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x4>(core.regs.hlwords.l, core.regs.afwords.a, c);
+		}
 
 		/// Opcode: 0X77, cycles: 8 ( LD (HL), A )
 		static void
-		operLD_AinPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseLD<0x8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.afwords.a), c); }
+		operLD_AinPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseLD<0x8>(core.regs.hl /* what is pointed by hl */, static_cast<udword_t>(core.regs.afwords.a), c);
+		}
 
 		/// Opcode: 0X7F, cycles: 4 ( LD A, A )
 		static void
-		operLD_AinA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operInlNop(core, c); }
+		operLD_AinA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operInlNop(core, c);
+		}
 
 		//////////////////////////
 		// 8 BIT ALU OPERATIONS //
@@ -1451,512 +1763,576 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0X80, cycles: 4 ( ADD A, B )
 		static void
-		operAdd_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X88, cycles: 4 ( ADC A, B )
 		static void
-		operAddCarry_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X90, cycles: 4 ( SUB B )
 		static void
-		operSub_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X98, cycles: 4 ( SBC A, B )
 		static void
-		operSubCarry_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA0, cycles: 4 ( AND B )
 		static void
-		operAnd_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA8, cycles: 4 ( XOR B )
 		static void
-		operXor_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB0, cycles: 4 ( OR B )
 		static void
-		operOr_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB8, cycles: 4 ( CP B )
 		static void
-		operCp_BtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_BtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.bcwords.b, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X81, cycles: 4 ( ADD A, C )
 		static void
-		operAdd_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X89, cycles: 4 ( ADC A, C )
 		static void
-		operAddCarry_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X91, cycles: 4 ( SUB C )
 		static void
-		operSub_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X99, cycles: 4 ( SBC A, C )
 		static void
-		operSubCarry_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA1, cycles: 4 ( AND C )
 		static void
-		operAnd_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA9, cycles: 4 ( XOR C )
 		static void
-		operXor_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB1, cycles: 4 ( OR C )
 		static void
-		operOr_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB9, cycles: 4 ( CP C )
 		static void
-		operCp_CtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_CtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.bcwords.c, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X82, cycles: 4 ( ADD A, D )
 		static void
-		operAdd_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8A, cycles: 4 ( ADC A, D )
 		static void
-		operAddCarry_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.dewords.d, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X92, cycles: 4 ( SUB D )
 		static void
-		operSub_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9A, cycles: 4 ( SBC A, D )
 		static void
-		operSubCarry_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.dewords.d, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA2, cycles: 4 ( AND D )
 		static void
-		operAnd_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAA, cycles: 4 ( XOR D )
 		static void
-		operXor_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB2, cycles: 4 ( OR D )
 		static void
-		operOr_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBA, cycles: 4 ( CP D )
 		static void
-		operCp_DtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_DtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.dewords.d, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X83, cycles: 4 ( ADD A, E )
 		static void
-		operAdd_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8B, cycles: 4 ( ADC A, E )
 		static void
-		operAddCarry_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.dewords.e, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X93, cycles: 4 ( SUB E )
 		static void
-		operSub_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9B, cycles: 4 ( SBC A, E )
 		static void
-		operSubCarry_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.dewords.e, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA3, cycles: 4 ( AND E )
 		static void
-		operAnd_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAB, cycles: 4 ( XOR E )
 		static void
-		operXor_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB3, cycles: 4 ( OR E )
 		static void
-		operOr_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBB, cycles: 4 ( CP E )
 		static void
-		operCp_EtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_EtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.dewords.e, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X84, cycles: 4 ( ADD A, H )
 		static void
-		operAdd_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8C, cycles: 4 ( ADC A, H )
 		static void
-		operAddCarry_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X94, cycles: 4 ( SUB H )
 		static void
-		operSub_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9C, cycles: 4 ( SBC A, H )
 		static void
-		operSubCarry_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA4, cycles: 4 ( AND H )
 		static void
-		operAnd_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAC, cycles: 4 ( XOR H )
 		static void
-		operXor_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB4, cycles: 4 ( OR H )
 		static void
-		operOr_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBC, cycles: 4 ( CP H )
 		static void
-		operCp_HtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_HtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hlwords.h, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X85, cycles: 4 ( ADD A, L )
 		static void
-		operAdd_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8D, cycles: 4 ( ADC A, L )
 		static void
-		operAddCarry_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X95, cycles: 4 ( SUB L )
 		static void
-		operSub_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9D, cycles: 4 ( SBC A, L )
 		static void
-		operSubCarry_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA5, cycles: 4 ( AND L )
 		static void
-		operAnd_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAD, cycles: 4 ( XOR L )
 		static void
-		operXor_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB5, cycles: 4 ( OR L )
 		static void
-		operOr_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBD, cycles: 4 ( CP L )
 		static void
-		operCp_LtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_LtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.hlwords.l, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X86, cycles: 8 ( ADD A, (HL) )
 		static void
-		operAdd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8E, cycles: 8 ( ADC A, (HL) )
 		static void
-		operAddCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X96, cycles: 8 ( SUB (HL) )
 		static void
-		operSub_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9E, cycles: 8 ( SBC A, (HL) )
 		static void
-		operSubCarry_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA6, cycles: 8( AND (HL) )
 		static void
-		operAnd_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAE, cycles: 8 ( XOR (HL) )
 		static void
-		operXor_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB6, cycles: 8 ( OR (HL) )
 		static void
-		operOr_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBE, cycles: 8 ( CP (HL) )
 		static void
-		operCp_PAddrHLtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_PAddrHLtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X8>(core.regs.afwords.a, core.regs.hl /* the value pointed by */, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X87, cycles: 4 ( ADD A, A )
 		static void
-		operAdd_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAdd_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAdd<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X8F, cycles: 4 ( ADC A, A )
 		static void
-		operAddCarry_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAddCarry_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAddCarry<0X4>(core.regs.afwords.a, core.regs.afwords.a, c, core.flags);
 			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X97, cycles: 4 ( SUB A )
 		static void
-		operSub_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSub_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSub<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0X9F, cycles: 4 ( SBC A, A )
 		static void
-		operSubCarry_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSubCarry_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseSubCarry<0X4>(core.regs.afwords.a, core.regs.afwords.a, c, core.flags);
 			handleFlagsOperSub(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XA7, cycles: 4 ( AND A )
 		static void
-		operAnd_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operAnd_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseAnd<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XAF, cycles: 4 ( XOR A )
 		static void
-		operXor_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operXor_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseXor<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperXor(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XB7, cycles: 4 ( OR A )
 		static void
-		operOr_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operOr_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseOr<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperOr(core.flags, core.regs.afwords.a);
 		}
 
 		/// Opcode: 0XBF, cycles: 4 ( CP A )
 		static void
-		operCp_AtoA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operCp_AtoA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
@@ -1970,321 +2346,473 @@ namespace GBMU_NAMESPACE {
 //
 		/// Opcode: 0XCB00, cycles: 8 ( RLC B )
 		static void
-		operRLC_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operRLC_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: 0XCB08, cycles: 8 ( RRC B )
 		static void
-		operRRC_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operRRC_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: 0XCB10, cycles: 8 ( RL B )
 		static void
-		operRL_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operRL_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: 0XCB18, cycles: 8 ( RR B )
 		static void
-		operRR_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operRR_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: 0XCB20, cycles: 8 ( SLA B )
 		static void
-		operSLA_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operSLA_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: 0XCB28, cycles: 8 ( SRA B )
 		static void
-		operSRA_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.bcwords.b, core.flags, c); }
+		operSRA_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.bcwords.b, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL B )
 
 		/// Opcode: 0XCB38, cycles: 8 ( SRL B )
 		static void
-		operSRL_B(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_B(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.bcwords.b, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB01, cycles: 8 ( RLC C )
 		static void
-		operRLC_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operRLC_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: 0XCB09, cycles: 8 ( RRC C )
 		static void
-		operRRC_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operRRC_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: 0XCB11, cycles: 8 ( RL C )
 		static void
-		operRL_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operRL_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: 0XCB19, cycles: 8 ( RR C )
 		static void
-		operRR_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operRR_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: 0XCB21, cycles: 8 ( SLA C )
 		static void
-		operSLA_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operSLA_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: 0XCB29, cycles: 8 ( SRA C )
 		static void
-		operSRA_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.bcwords.c, core.flags, c); }
+		operSRA_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.bcwords.c, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL C )
 
 		/// Opcode: 0XCB39, cycles: 8 ( SRL C )
 		static void
-		operSRL_C(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.bcwords.c, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB02, cycles: 8 ( RLC D )
 		static void
-		operRLC_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.dewords.d, core.flags, c); }
+		operRLC_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: 0XCB0A, cycles: 8 ( RRC D )
 		static void
-		operRRC_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.dewords.d, core.flags, c); }
+		operRRC_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: 0XCB12, cycles: 8 ( RL D )
 		static void
-		operRL_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.dewords.d, core.flags, c); }
+		operRL_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1A, cycles: 8 ( RR D )
 		static void
-		operRR_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.dewords.d, core.flags, c); }
+		operRR_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: 0XCB22, cycles: 8 ( SLA D )
 		static void
-		operSLA_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.dewords.d, core.flags, c); }
+		operSLA_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2A, cycles: 8 ( SRA D )
 		static void
-		operSRA_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.dewords.d, core.flags, c); }
+		operSRA_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.dewords.d, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL D )
 
 		/// Opcode: 0XCB3A, cycles: 8 ( SRL D )
 		static void
-		operSRL_D(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_D(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.dewords.d, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB03, cycles: 8 ( RLC E )
 		static void
-		operRLC_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.dewords.e, core.flags, c); }
+		operRLC_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: 0XCB0B, cycles: 8 ( RRC E )
 		static void
-		operRRC_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.dewords.e, core.flags, c); }
+		operRRC_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: 0XCB13, cycles: 8 ( RL E )
 		static void
-		operRL_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.dewords.e, core.flags, c); }
+		operRL_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1B, cycles: 8 ( RR E )
 		static void
-		operRR_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.dewords.e, core.flags, c); }
+		operRR_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: 0XCB23, cycles: 8 ( SLA E )
 		static void
-		operSLA_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.dewords.e, core.flags, c); }
+		operSLA_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2B, cycles: 8 ( SRA E )
 		static void
-		operSRA_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.dewords.e, core.flags, c); }
+		operSRA_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.dewords.e, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL E )
 
 		/// Opcode: 0XCB3B, cycles: 8 ( SRL E )
 		static void
-		operSRL_E(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_E(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.dewords.e, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB04, cycles: 8 ( RLC H )
 		static void
-		operRLC_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operRLC_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: 0XCB0C, cycles: 8 ( RRC H )
 		static void
-		operRRC_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operRRC_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: 0XCB14, cycles: 8 ( RL H )
 		static void
-		operRL_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operRL_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1C, cycles: 8 ( RR H )
 		static void
-		operRR_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operRR_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: 0XCB24, cycles: 8 ( SLA H )
 		static void
-		operSLA_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operSLA_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2C, cycles: 8 ( SRA H )
 		static void
-		operSRA_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.hlwords.h, core.flags, c); }
+		operSRA_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.hlwords.h, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL H )
 
 		/// Opcode: 0XCB3C, cycles: 8 ( SRL H )
 		static void
-		operSRL_H(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_H(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.hlwords.h, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB05, cycles: 8 ( RLC L )
 		static void
-		operRLC_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operRLC_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: 0XCB0D, cycles: 8 ( RRC L )
 		static void
-		operRRC_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operRRC_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: 0XCB15, cycles: 8 ( RL L )
 		static void
-		operRL_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operRL_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1D, cycles: 8 ( RR L )
 		static void
-		operRR_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operRR_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: 0XCB25, cycles: 8 ( SLA L )
 		static void
-		operSLA_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operSLA_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2D, cycles: 8 ( SRA L )
 		static void
-		operSRA_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.hlwords.l, core.flags, c); }
+		operSRA_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.hlwords.l, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL L )
 
 		/// Opcode: 0XCB3D, cycles: 8 ( SRL L )
 		static void
-		operSRL_L(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_L(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.hlwords.l, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB06, cycles: 16 ( RLC (HL) )
 		static void
-		operRLC_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operRLC_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: 0XCB0E, cycles: 16 ( RRC (HL) )
 		static void
-		operRRC_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operRRC_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: 0XCB16, cycles: 16 ( RL (HL) )
 		static void
-		operRL_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operRL_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1E, cycles: 16 ( RR (HL) )
 		static void
-		operRR_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operRR_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: 0XCB26, cycles: 16 ( SLA (HL) )
 		static void
-		operSLA_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operSLA_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2E, cycles: 16 ( SRA (HL) )
 		static void
-		operSRA_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c); }
+		operSRA_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 16 ( SLL (HL) )
 
 		/// Opcode: 0XCB3E, cycles: 16 ( SRL (HL) )
 		static void
-		operSRL_PAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_PAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X10>(core.regs.hl /* value pointed by */, core.flags, c);
 			///TODO: set MSB to 0
 		}
 
 		/// Opcode: 0XCB07, cycles: 8 ( RLC A )
 		static void
-		operRLC_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeftCarry<0X8>(core.regs.afwords.a, core.flags, c); }
+		operRLC_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeftCarry<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 
 		/// Opcode: 0XCB0F, cycles: 8 ( RRC A )
 		static void
-		operRRC_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRightCarry<0X8>(core.regs.afwords.a, core.flags, c); }
+		operRRC_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRightCarry<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0XCB17, cycles: 8 ( RL A )
 		static void
-		operRL_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateLeft<0X8>(core.regs.afwords.a, core.flags, c); }
+		operRL_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateLeft<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0XCB1F, cycles: 8 ( RR A )
 		static void
-		operRR_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRotateRight<0X8>(core.regs.afwords.a, core.flags, c); }
+		operRR_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRotateRight<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0XCB27, cycles: 8 ( SLA A )
 		static void
-		operSLA_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftLeft<0X8>(core.regs.afwords.a, core.flags, c); }
+		operSLA_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftLeft<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: 0XCB2F, cycles: 8 ( SRA A )
 		static void
-		operSRA_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseShiftRight<0X8>(core.regs.afwords.a, core.flags, c); }
+		operSRA_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseShiftRight<0X8>(core.regs.afwords.a, core.flags, c);
+		}
 
 		/// Opcode: ?, cycles: 8 ( SLL A )
 
 		/// Opcode: 0XCB3F, cycles: 8 ( SRL A )
 		static void
-		operSRL_A(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
+		operSRL_A(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
+			static_cast<void>(op);
 			operBaseShiftLeft<0X8>(core.regs.afwords.a, core.flags, c);
 			///TODO: set MSB to 0
 		}
@@ -2294,323 +2822,515 @@ namespace GBMU_NAMESPACE {
 //
 		/// Opcode: 0XCB40, cycles: 8 ( BIT 0, B )
 		static void
-		operBit_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT0, core.flags, c); }
+		operBit_Bit0inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB48, cycles: 8 ( BIT 1, B )
 		static void
-		operBit_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT1, core.flags, c); }
+		operBit_Bit1inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB50, cycles: 8 ( BIT 2, B )
 		static void
-		operBit_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT2, core.flags, c); }
+		operBit_Bit2inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB58, cycles: 8 ( BIT 3, B )
 		static void
-		operBit_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT3, core.flags, c); }
+		operBit_Bit3inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB60, cycles: 8 ( BIT 4, B )
 		static void
-		operBit_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT4, core.flags, c); }
+		operBit_Bit4inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB68, cycles: 8 ( BIT 5, B )
 		static void
-		operBit_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT5, core.flags, c); }
+		operBit_Bit5inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB70, cycles: 8 ( BIT 6, B )
 		static void
-		operBit_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT6, core.flags, c); }
+		operBit_Bit6inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB78, cycles: 8 ( BIT 7, B )
 		static void
-		operBit_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT7, core.flags, c); }
+		operBit_Bit7inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.b, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB41, cycles: 8 ( BIT 0, C )
 		static void
-		operBit_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT0, core.flags, c); }
+		operBit_Bit0inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB49, cycles: 8 ( BIT 1, C )
 		static void
-		operBit_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT1, core.flags, c); }
+		operBit_Bit1inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB51, cycles: 8 ( BIT 2, C )
 		static void
-		operBit_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT2, core.flags, c); }
+		operBit_Bit2inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB59, cycles: 8 ( BIT 3, C )
 		static void
-		operBit_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT3, core.flags, c); }
+		operBit_Bit3inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB61, cycles: 8 ( BIT 4, C )
 		static void
-		operBit_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT4, core.flags, c); }
+		operBit_Bit4inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB69, cycles: 8 ( BIT 5, C )
 		static void
-		operBit_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT5, core.flags, c); }
+		operBit_Bit5inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB71, cycles: 8 ( BIT 6, C )
 		static void
-		operBit_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT6, core.flags, c); }
+		operBit_Bit6inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB79, cycles: 8 ( BIT 7, C )
 		static void
-		operBit_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT7, core.flags, c); }
+		operBit_Bit7inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.bcwords.c, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB42, cycles: 8 ( BIT 0, D )
 		static void
-		operBit_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT0, core.flags, c); }
+		operBit_Bit0inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4A, cycles: 8 ( BIT 1, D )
 		static void
-		operBit_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT1, core.flags, c); }
+		operBit_Bit1inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB52, cycles: 8 ( BIT 2, D )
 		static void
-		operBit_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT2, core.flags, c); }
+		operBit_Bit2inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5A, cycles: 8 ( BIT 3, D )
 		static void
-		operBit_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT3, core.flags, c); }
+		operBit_Bit3inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB62, cycles: 8 ( BIT 4, D )
 		static void
-		operBit_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT4, core.flags, c); }
+		operBit_Bit4inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6A, cycles: 8 ( BIT 5, D )
 		static void
-		operBit_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT5, core.flags, c); }
+		operBit_Bit5inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB72, cycles: 8 ( BIT 6, D )
 		static void
-		operBit_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT6, core.flags, c); }
+		operBit_Bit6inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7A, cycles: 8 ( BIT 7, D )
 		static void
-		operBit_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.d, MASKBIT7, core.flags, c); }
+		operBit_Bit7inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.d, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB43, cycles: 8 ( BIT 0, E )
 		static void
-		operBit_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT0, core.flags, c); }
+		operBit_Bit0inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4B, cycles: 8 ( BIT 1, E )
 		static void
-		operBit_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT1, core.flags, c); }
+		operBit_Bit1inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB53, cycles: 8 ( BIT 2, E )
 		static void
-		operBit_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT2, core.flags, c); }
+		operBit_Bit2inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5B, cycles: 8 ( BIT 3, E )
 		static void
-		operBit_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT3, core.flags, c); }
+		operBit_Bit3inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB63, cycles: 8 ( BIT 4, E )
 		static void
-		operBit_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT4, core.flags, c); }
+		operBit_Bit4inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6B, cycles: 8 ( BIT 5, E )
 		static void
-		operBit_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT5, core.flags, c); }
+		operBit_Bit5inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB73, cycles: 8 ( BIT 6, E )
 		static void
-		operBit_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT6, core.flags, c); }
+		operBit_Bit6inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7B, cycles: 8 ( BIT 7, E )
 		static void
-		operBit_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.dewords.e, MASKBIT7, core.flags, c); }
+		operBit_Bit7inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.dewords.e, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB44, cycles: 8 ( BIT 0, H )
 		static void
-		operBit_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT0, core.flags, c); }
+		operBit_Bit0inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4C, cycles: 8 ( BIT 1, H )
 		static void
-		operBit_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT1, core.flags, c); }
+		operBit_Bit1inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB54, cycles: 8 ( BIT 2, H )
 		static void
-		operBit_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT2, core.flags, c); }
+		operBit_Bit2inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5C, cycles: 8 ( BIT 3, H )
 		static void
-		operBit_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT3, core.flags, c); }
+		operBit_Bit3inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB64, cycles: 8 ( BIT 4, H )
 		static void
-		operBit_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT4, core.flags, c); }
+		operBit_Bit4inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6C, cycles: 8 ( BIT 5, H )
 		static void
-		operBit_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT5, core.flags, c); }
+		operBit_Bit5inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB74, cycles: 8 ( BIT 6, H )
 		static void
-		operBit_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT6, core.flags, c); }
+		operBit_Bit6inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7C, cycles: 8 ( BIT 7, H )
 		static void
-		operBit_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT7, core.flags, c); }
+		operBit_Bit7inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.h, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB45, cycles: 8 ( BIT 0, L )
 		static void
-		operBit_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT0, core.flags, c); }
+		operBit_Bit0inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4D, cycles: 8 ( BIT 1, L )
 		static void
-		operBit_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT1, core.flags, c); }
+		operBit_Bit1inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB55, cycles: 8 ( BIT 2, L )
 		static void
-		operBit_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT2, core.flags, c); }
+		operBit_Bit2inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5D, cycles: 8 ( BIT 3, L )
 		static void
-		operBit_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT3, core.flags, c); }
+		operBit_Bit3inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB65, cycles: 8 ( BIT 4, L )
 		static void
-		operBit_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT4, core.flags, c); }
+		operBit_Bit4inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6D, cycles: 8 ( BIT 5, L )
 		static void
-		operBit_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT5, core.flags, c); }
+		operBit_Bit5inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB75, cycles: 8 ( BIT 6, L )
 		static void
-		operBit_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT6, core.flags, c); }
+		operBit_Bit6inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7D, cycles: 8 ( BIT 7, L )
 		static void
-		operBit_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT7, core.flags, c); }
+		operBit_Bit7inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.hlwords.l, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB46, cycles: 16 ( BIT 0, (HL) )
 		static void
-		operBit_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT0, core.flags, c); }
+		operBit_Bit0inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4E, cycles: 16 ( BIT 1, (HL) )
 		static void
-		operBit_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT1, core.flags, c); }
+		operBit_Bit1inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB56, cycles: 16 ( BIT 2, (HL) )
 		static void
-		operBit_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT2, core.flags, c); }
+		operBit_Bit2inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5E, cycles: 16 ( BIT 3, (HL) )
 		static void
-		operBit_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT3, core.flags, c); }
+		operBit_Bit3inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB66, cycles: 16 ( BIT 4, (HL) )
 		static void
-		operBit_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT4, core.flags, c); }
+		operBit_Bit4inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6E, cycles: 16 ( BIT 5, (HL) )
 		static void
-		operBit_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT5, core.flags, c); }
+		operBit_Bit5inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB76, cycles: 16 ( BIT 6, (HL) )
 		static void
-		operBit_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT6, core.flags, c); }
+		operBit_Bit6inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7E, cycles: 16 ( BIT 7, (HL) )
 		static void
-		operBit_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT7, core.flags, c); }
+		operBit_Bit7inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0X10>(core.regs.hl /* the value pointed by */, MASKBIT7, core.flags, c);
+		}
 
 		/// Opcode: 0XCB47, cycles: 8 ( BIT 0, A )
 		static void
-		operBit_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT0, core.flags, c); }
+		operBit_Bit0inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT0, core.flags, c);
+		}
 
 		/// Opcode: 0XCB4F, cycles: 8 ( BIT 1, A )
 		static void
-		operBit_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT1, core.flags, c); }
+		operBit_Bit1inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT1, core.flags, c);
+		}
 
 		/// Opcode: 0XCB57, cycles: 8 ( BIT 2, A )
 		static void
-		operBit_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT2, core.flags, c); }
+		operBit_Bit2inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT2, core.flags, c);
+		}
 
 		/// Opcode: 0XCB5F, cycles: 8 ( BIT 3, A )
 		static void
-		operBit_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT3, core.flags, c); }
+		operBit_Bit3inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT3, core.flags, c);
+		}
 
 		/// Opcode: 0XCB67, cycles: 8 ( BIT 4, A )
 		static void
-		operBit_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT4, core.flags, c); }
+		operBit_Bit4inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT4, core.flags, c);
+		}
 
 		/// Opcode: 0XCB6F, cycles: 8 ( BIT 5, A )
 		static void
-		operBit_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT5, core.flags, c); }
+		operBit_Bit5inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT5, core.flags, c);
+		}
 
 		/// Opcode: 0XCB77, cycles: 8 ( BIT 6, A )
 		static void
-		operBit_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT6, core.flags, c); }
+		operBit_Bit6inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT6, core.flags, c);
+		}
 
 		/// Opcode: 0XCB7F, cycles: 8 ( BIT 7, A )
 		static void
-		operBit_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseBit<0x8>(core.regs.afwords.a, MASKBIT7, core.flags, c); }
+		operBit_Bit7inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseBit<0x8>(core.regs.afwords.a, MASKBIT7, core.flags, c);
+		}
 
 //
 ///TODO: All p & q have been set, find which one set to operNop
@@ -2618,323 +3338,515 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0XCB80, cycles: 8 ( RES 0, B )
 		static void
-		operRes_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
+		operRes_Bit0inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB88, cycles: 8 ( RES 1, B )
 		static void
-		operRes_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
+		operRes_Bit1inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB90, cycles: 8 ( RES 2, B )
 		static void
-		operRes_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
+		operRes_Bit2inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB98, cycles: 8 ( RES 3, B )
 		static void
-		operRes_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
+		operRes_Bit3inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA0, cycles: 8 ( RES 4, B )
 		static void
-		operRes_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
+		operRes_Bit4inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBA8, cycles: 8 ( RES 5, B )
 		static void
-		operRes_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
+		operRes_Bit5inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB0, cycles: 8 ( RES 6, B )
 		static void
-		operRes_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
+		operRes_Bit6inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBB8, cycles: 8 ( RES 7, B )
 		static void
-		operRes_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
+		operRes_Bit7inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.b, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB81, cycles: 8 ( RES 0, C )
 		static void
-		operRes_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
+		operRes_Bit0inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB89, cycles: 8 ( RES 1, C )
 		static void
-		operRes_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
+		operRes_Bit1inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB91, cycles: 8 ( RES 2, C )
 		static void
-		operRes_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
+		operRes_Bit2inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB99, cycles: 8 ( RES 3, C )
 		static void
-		operRes_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
+		operRes_Bit3inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA1, cycles: 8 ( RES 4, C )
 		static void
-		operRes_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
+		operRes_Bit4inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBA9, cycles: 8 ( RES 5, C )
 		static void
-		operRes_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
+		operRes_Bit5inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB1, cycles: 8 ( RES 6, C )
 		static void
-		operRes_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
+		operRes_Bit6inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBB9, cycles: 8 ( RES 7, C )
 		static void
-		operRes_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
+		operRes_Bit7inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.bcwords.c, MASKBIT7, c);
+		}
 
 		/// Opcode: 0ZCB82, cycles: 8 ( RES 0, D )
 		static void
-		operRes_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT0, c); }
+		operRes_Bit0inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8A, cycles: 8 ( RES 1, D )
 		static void
-		operRes_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT1, c); }
+		operRes_Bit1inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB92, cycles: 8 ( RES 2, D )
 		static void
-		operRes_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT2, c); }
+		operRes_Bit2inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9A, cycles: 8 ( RES 3, D )
 		static void
-		operRes_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT3, c); }
+		operRes_Bit3inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT3, c);
+		}
 
 		/// Opcode: OXCBA2, cycles: 8 ( RES 4, D )
 		static void
-		operRes_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT4, c); }
+		operRes_Bit4inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAA, cycles: 8 ( RES 5, D )
 		static void
-		operRes_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT5, c); }
+		operRes_Bit5inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB2, cycles: 8 ( RES 6, D )
 		static void
-		operRes_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT6, c); }
+		operRes_Bit6inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBA, cycles: 8 ( RES 7, D )
 		static void
-		operRes_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.d, MASKBIT7, c); }
+		operRes_Bit7inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.d, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB83, cycles: 8 ( RES 0, E )
 		static void
-		operRes_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT0, c); }
+		operRes_Bit0inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8B, cycles: 8 ( RES 1, E )
 		static void
-		operRes_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT1, c); }
+		operRes_Bit1inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB93, cycles: 8 ( RES 2, E )
 		static void
-		operRes_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT2, c); }
+		operRes_Bit2inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9B, cycles: 8 ( RES 3, E )
 		static void
-		operRes_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT3, c); }
+		operRes_Bit3inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA3, cycles: 8 ( RES 4, E )
 		static void
-		operRes_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT4, c); }
+		operRes_Bit4inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAB, cycles: 8 ( RES 5, E )
 		static void
-		operRes_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT5, c); }
+		operRes_Bit5inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB3, cycles: 8 ( RES 6, E )
 		static void
-		operRes_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT6, c); }
+		operRes_Bit6inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBB, cycles: 8 ( RES 7, E )
 		static void
-		operRes_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.dewords.e, MASKBIT7, c); }
+		operRes_Bit7inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.dewords.e, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB84, cycles: 8 ( RES 0, H )
 		static void
-		operRes_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
+		operRes_Bit0inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8C, cycles: 8 ( RES 1, H )
 		static void
-		operRes_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
+		operRes_Bit1inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB94, cycles: 8 ( RES 2, H )
 		static void
-		operRes_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
+		operRes_Bit2inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9C, cycles: 8 ( RES 3, H )
 		static void
-		operRes_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
+		operRes_Bit3inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA4, cycles: 8 ( RES 4, H )
 		static void
-		operRes_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
+		operRes_Bit4inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAC, cycles: 8 ( RES 5, H )
 		static void
-		operRes_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
+		operRes_Bit5inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB4, cycles: 8 ( RES 6, H )
 		static void
-		operRes_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
+		operRes_Bit6inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBC, cycles: 8 ( RES 7, H )
 		static void
-		operRes_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
+		operRes_Bit7inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.h, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB85, cycles: 8 ( RES 0, L )
 		static void
-		operRes_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
+		operRes_Bit0inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8D, cycles: 8 ( RES 1, L )
 		static void
-		operRes_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
+		operRes_Bit1inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB95, cycles: 8 ( RES 2, L )
 		static void
-		operRes_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT2, c); }
+		operRes_Bit2inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9D, cycles: 8 ( RES 3, L )
 		static void
-		operRes_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+		operRes_Bit3inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA5, cycles: 8 ( RES 4, L )
 		static void
-		operRes_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
+		operRes_Bit4inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAD, cycles: 8 ( RES 5, L )
 		static void
-		operRes_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
+		operRes_Bit5inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB5, cycles: 8 ( RES 6, L )
 		static void
-		operRes_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
+		operRes_Bit6inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBD, cycles: 8 ( RES 7, L )
 		static void
-		operRes_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
+		operRes_Bit7inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.hlwords.l, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB86, cycles: 8 ( RES 0, (HL) )
 		static void
-		operRes_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
+		operRes_Bit0inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8E, cycles: 8 ( RES 1, (HL) )
 		static void
-		operRes_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
+		operRes_Bit1inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB96, cycles: 8 ( RES 2, (HL) )
 		static void
-		operRes_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
+		operRes_Bit2inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9E, cycles: 8 ( RES 3, (HL) )
 		static void
-		operRes_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
+		operRes_Bit3inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA6, cycles: 8 ( RES 4, (HL) )
 		static void
-		operRes_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
+		operRes_Bit4inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAE, cycles: 8 ( RES 5, (HL) )
 		static void
-		operRes_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
+		operRes_Bit5inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB6, cycles: 8 ( RES 6, (HL) )
 		static void
-		operRes_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
+		operRes_Bit6inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBE, cycles: 8 ( RES 7, (HL) )
 		static void
-		operRes_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
+		operRes_Bit7inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCB87, cycles: 8 ( RES 0, A )
 		static void
-		operRes_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT0, c); }
+		operRes_Bit0inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCB8F, cycles: 8 ( RES 1, A )
 		static void
-		operRes_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT1, c); }
+		operRes_Bit1inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCB97, cycles: 8 ( RES 2, A )
 		static void
-		operRes_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT2, c); }
+		operRes_Bit2inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCB9F, cycles: 8 ( RES 3, A )
 		static void
-		operRes_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT3, c); }
+		operRes_Bit3inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBA7, cycles: 8 ( RES 4, A )
 		static void
-		operRes_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT4, c); }
+		operRes_Bit4inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBAF, cycles: 8 ( RES 5, A )
 		static void
-		operRes_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT5, c); }
+		operRes_Bit5inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBB7, cycles: 8 ( RES 6, A )
 		static void
-		operRes_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT6, c); }
+		operRes_Bit6inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBBF, cycles: 8 ( RES 7, A )
 		static void
-		operRes_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseRes<0x8>(core.regs.afwords.a, MASKBIT7, c); }
+		operRes_Bit7inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseRes<0x8>(core.regs.afwords.a, MASKBIT7, c);
+		}
 
 //
 ///TODO: All p & q have been set, find which one set to operNop
@@ -2942,323 +3854,515 @@ namespace GBMU_NAMESPACE {
 
 		/// Opcode: 0XCBC0, cycles: 8 ( SET 0, B )
 		static void
-		operSet_Bit0inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT0, c); }
+		operSet_Bit0inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT0, c);
+		}
 
 		/// Opcode: OXCBC8, cycles: 8 ( SET 1, B )
 		static void
-		operSet_Bit1inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT1, c); }
+		operSet_Bit1inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD0, cycles: 8 ( SET 2, B )
 		static void
-		operSet_Bit2inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT2, c); }
+		operSet_Bit2inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBD8, cycles: 8 ( SET 3, B )
 		static void
-		operSet_Bit3inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT3, c); }
+		operSet_Bit3inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE0, cycles: 8 ( SET 4, B )
 		static void
-		operSet_Bit4inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT4, c); }
+		operSet_Bit4inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBE8, cycles: 8 ( SET 5, B )
 		static void
-		operSet_Bit5inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT5, c); }
+		operSet_Bit5inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF0, cycles: 8 ( SET 6, B )
 		static void
-		operSet_Bit6inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT6, c); }
+		operSet_Bit6inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBF8, cycles: 8 ( SET 7, B )
 		static void
-		operSet_Bit7inB(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT7, c); }
+		operSet_Bit7inB(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.b, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC1, cycles: 8 ( SET 0, C )
 		static void
-		operSet_Bit0inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT0, c); }
+		operSet_Bit0inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBC9, cycles: 8 ( SET 1, C )
 		static void
-		operSet_Bit1inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT1, c); }
+		operSet_Bit1inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD1, cycles: 8 ( SET 2, C )
 		static void
-		operSet_Bit2inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT2, c); }
+		operSet_Bit2inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBD9, cycles: 8 ( SET 3, C )
 		static void
-		operSet_Bit3inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT3, c); }
+		operSet_Bit3inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE1, cycles: 8 ( SET 4, C )
 		static void
-		operSet_Bit4inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT4, c); }
+		operSet_Bit4inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBE9, cycles: 8 ( SET 5, C )
 		static void
-		operSet_Bit5inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT5, c); }
+		operSet_Bit5inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF1, cycles: 8 ( SET 6, C )
 		static void
-		operSet_Bit6inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT6, c); }
+		operSet_Bit6inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBF9, cycles: 8 ( SET 7, C )
 		static void
-		operSet_Bit7inC(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT7, c); }
+		operSet_Bit7inC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.bcwords.c, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC2, cycles: 8 ( SET 0, D )
 		static void
-		operSet_Bit0inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT0, c); }
+		operSet_Bit0inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT0, c);
+		}
 
 		/// Opcode: 0CCBCA, cycles: 8 ( SET 1, D )
 		static void
-		operSet_Bit1inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT1, c); }
+		operSet_Bit1inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD2, cycles: 8 ( SET 2, D )
 		static void
-		operSet_Bit2inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT2, c); }
+		operSet_Bit2inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBDA, cycles: 8 ( SET 3, D )
 		static void
-		operSet_Bit3inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT3, c); }
+		operSet_Bit3inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE2, cycles: 8 ( SET 4, D )
 		static void
-		operSet_Bit4inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT4, c); }
+		operSet_Bit4inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBEA, cycles: 8 ( SET 5, D )
 		static void
-		operSet_Bit5inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT5, c); }
+		operSet_Bit5inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF2, cycles: 8 ( SET 6, D )
 		static void
-		operSet_Bit6inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT6, c); }
+		operSet_Bit6inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBFA, cycles: 8 ( SET 7, D )
 		static void
-		operSet_Bit7inD(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.d, MASKBIT7, c); }
+		operSet_Bit7inD(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.d, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC3, cycles: 8 ( SET 0, E )
 		static void
-		operSet_Bit0inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT0, c); }
+		operSet_Bit0inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBCB, cycles: 8 ( SET 1, E )
 		static void
-		operSet_Bit1inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT1, c); }
+		operSet_Bit1inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD3, cycles: 8 ( SET 2, E )
 		static void
-		operSet_Bit2inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT2, c); }
+		operSet_Bit2inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBDB, cycles: 8 ( SET 3, E )
 		static void
-		operSet_Bit3inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT3, c); }
+		operSet_Bit3inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE3, cycles: 8 ( SET 4, E )
 		static void
-		operSet_Bit4inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT4, c); }
+		operSet_Bit4inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBEB, cycles: 8 ( SET 5, E )
 		static void
-		operSet_Bit5inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT5, c); }
+		operSet_Bit5inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF3, cycles: 8 ( SET 6, E )
 		static void
-		operSet_Bit6inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT6, c); }
+		operSet_Bit6inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBFB, cycles: 8 ( SET 7, E )
 		static void
-		operSet_Bit7inE(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.dewords.e, MASKBIT7, c); }
+		operSet_Bit7inE(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.dewords.e, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC4, cycles: 8 ( SET 0, H )
 		static void
-		operSet_Bit0inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT0, c); }
+		operSet_Bit0inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBCC, cycles: 8 ( SET 1, H )
 		static void
-		operSet_Bit1inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT1, c); }
+		operSet_Bit1inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD4, cycles: 8 ( SET 2, H )
 		static void
-		operSet_Bit2inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT2, c); }
+		operSet_Bit2inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBDC, cycles: 8 ( SET 3, H )
 		static void
-		operSet_Bit3inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT3, c); }
+		operSet_Bit3inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE4, cycles: 8 ( SET 4, H )
 		static void
-		operSet_Bit4inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT4, c); }
+		operSet_Bit4inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBEC, cycles: 8 ( SET 5, H )
 		static void
-		operSet_Bit5inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT5, c); }
+		operSet_Bit5inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF4, cycles: 8 ( SET 6, H )
 		static void
-		operSet_Bit6inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT6, c); }
+		operSet_Bit6inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBFC, cycles: 8 ( SET 7, H )
 		static void
-		operSet_Bit7inH(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT7, c); }
+		operSet_Bit7inH(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.h, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC5, cycles: 8 ( SET 0, L )
 		static void
-		operSet_Bit0inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT0, c); }
+		operSet_Bit0inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBCD, cycles: 8 ( SET 1, L )
 		static void
-		operSet_Bit1inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT1, c); }
+		operSet_Bit1inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD5, cycles: 8 ( SET 2, L )
 		static void
-		operSet_Bit2inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+		operSet_Bit2inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBDD, cycles: 8 ( SET 3, L )
 		static void
-		operSet_Bit3inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c); }
+		operSet_Bit3inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE5, cycles: 8 ( SET 4, L )
 		static void
-		operSet_Bit4inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT4, c); }
+		operSet_Bit4inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBED, cycles: 8 ( SET 5, L )
 		static void
-		operSet_Bit5inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT5, c); }
+		operSet_Bit5inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF5, cycles: 8 ( SET 6, L )
 		static void
-		operSet_Bit6inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT6, c); }
+		operSet_Bit6inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT6, c);
+		}
 
 		/// Opcode: OXCBFD, cycles: 8 ( SET 7, L )
 		static void
-		operSet_Bit7inL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT7, c); }
+		operSet_Bit7inL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.hlwords.l, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC6, cycles: 16 ( SET 0, (HL) )
 		static void
-		operSet_Bit0inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c); }
+		operSet_Bit0inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBCE, cycles: 16 ( SET 1, (HL) )
 		static void
-		operSet_Bit1inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c); }
+		operSet_Bit1inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD6, cycles: 16 ( SET 2, (HL) )
 		static void
-		operSet_Bit2inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c); }
+		operSet_Bit2inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBDE, cycles: 16 ( SET 3, (HL) )
 		static void
-		operSet_Bit3inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c); }
+		operSet_Bit3inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE6, cycles: 16 ( SET 4, (HL) )
 		static void
-		operSet_Bit4inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c); }
+		operSet_Bit4inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBEE, cycles: 16 ( SET 5, (HL) )
 		static void
-		operSet_Bit5inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c); }
+		operSet_Bit5inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF6, cycles: 16 ( SET 6, (HL) )
 		static void
-		operSet_Bit6inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c); }
+		operSet_Bit6inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBFE, cycles: 16 ( SET 7, (HL) )
 		static void
-		operSet_Bit7inPAddrHL(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c); }
+		operSet_Bit7inPAddrHL(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x10>(core.regs.hl /* The value pointed by */, MASKBIT7, c);
+		}
 
 		/// Opcode: 0XCBC7, cycles: 8 ( SET 0, A )
 		static void
-		operSet_Bit0inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT0, c); }
+		operSet_Bit0inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT0, c);
+		}
 
 		/// Opcode: 0XCBCF, cycles: 8 ( SET 1, A )
 		static void
-		operSet_Bit1inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT1, c); }
+		operSet_Bit1inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT1, c);
+		}
 
 		/// Opcode: 0XCBD7, cycles: 8 ( SET 2, A )
 		static void
-		operSet_Bit2inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT2, c); }
+		operSet_Bit2inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT2, c);
+		}
 
 		/// Opcode: 0XCBDF, cycles: 8 ( SET 3, A )
 		static void
-		operSet_Bit3inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT3, c); }
+		operSet_Bit3inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT3, c);
+		}
 
 		/// Opcode: 0XCBE7, cycles: 8 ( SET 4, A )
 		static void
-		operSet_Bit4inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT4, c); }
+		operSet_Bit4inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT4, c);
+		}
 
 		/// Opcode: 0XCBEF, cycles: 8 ( SET 5, A )
 		static void
-		operSet_Bit5inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT5, c); }
+		operSet_Bit5inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT5, c);
+		}
 
 		/// Opcode: 0XCBF7, cycles: 8 ( SET 6, A )
 		static void
-		operSet_Bit6inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT6, c); }
+		operSet_Bit6inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT6, c);
+		}
 
 		/// Opcode: 0XCBFF, cycles: 8 ( SET 7, A )
 		static void
-		operSet_Bit7inA(const CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c)
-		{ operBaseSet<0x8>(core.regs.afwords.a, MASKBIT7, c); }
+		operSet_Bit7inA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseSet<0x8>(core.regs.afwords.a, MASKBIT7, c);
+		}
 
 
 
@@ -48638,7 +49742,7 @@ namespace GBMU_NAMESPACE {
 		struct ExceptionInvalidOpcode : std::exception
 		{ const char* what() const noexcept { return "invalid opcode: out of bounds"; } };
 
-		void executeOperation(const Opcode& opcode)
+		void executeOperation(const Opcode&& opcode)
 		// may throw ExceptionInvalidOpcode
 		{
 			Chrono c;
@@ -48647,13 +49751,24 @@ namespace GBMU_NAMESPACE {
 			{
 				this->operations[this->getPrefixIndex(opcode.getPrefixFamily())]
 				[opcode.getX()][opcode.getZ()][opcode.getY()]
-				[opcode.getQ()][opcode.getP()](*this, c);
+				[opcode.getQ()][opcode.getP()](*this, c, opcode);
 
 				// TO DO: Add cycles handler
 			}
 			else
 				throw ExceptionInvalidOpcode();
 			c.waitForCycles();
+		}
+
+		void executeOperations(const uint8_t* raw)
+		{
+			// Just a possible implementation
+			for ( ; ; /* end of opcodes */)
+			{
+				Opcode op(raw);
+				this->executeOperation(op);
+				raw = op.getNextOpcode();
+			}
 		}
 
 		public:
