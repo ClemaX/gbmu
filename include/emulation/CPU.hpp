@@ -91,14 +91,14 @@ namespace GBMU_NAMESPACE {
 		uint8_t	getImmediateData8b()
 		{
 			const uint8_t res = *this->getNextOpcode();
-			this->paramSize++;
+			this->paramSize += sizeof(uint8_t);
 			return res;
 		}
 
 		uint16_t getImmediateData16b()
 		{
 			const uint16_t res = *reinterpret_cast<const uint16_t*>(this->getNextOpcode());
-			this->paramSize += 2;
+			this->paramSize += sizeof(uint16_t);
 			return res;
 		}
 
@@ -2334,6 +2334,74 @@ namespace GBMU_NAMESPACE {
 		{
 			static_cast<void>(op);
 			operBaseCp<0X4>(core.regs.afwords.a, core.regs.afwords.a, c);
+			handleFlagsOperCp(core.flags, core.regs.afwords.a);
+		}
+
+//
+///TODO: Document those
+//
+
+		/// Opcode: ?, cycles: 4 ( ADD A, n )
+		static void
+		operAdd_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseAdd<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( ADC A, n )
+		static void
+		operAddCarry_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseAddCarry<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c, core.flags);
+			handleFlagsOperAdd(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( SUB n )
+		static void
+		operSub_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseSub<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( SBC A, n )
+		static void
+		operSubCarry_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseSubCarry<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c, core.flags);
+			handleFlagsOperSub(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( AND n )
+		static void
+		operAnd_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseAnd<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
+			handleFlagsOperAnd(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( XOR n )
+		static void
+		operXor_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseXor<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
+			handleFlagsOperXor(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( OR n )
+		static void
+		operOr_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseOr<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
+			handleFlagsOperOr(core.flags, core.regs.afwords.a);
+		}
+
+		/// Opcode: ?, cycles: 4 ( CP n )
+		static void
+		operCp_ImmediateToA(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			operBaseCp<0X4>(core.regs.afwords.a, op.getImmediateData8b(), c);
 			handleFlagsOperCp(core.flags, core.regs.afwords.a);
 		}
 
@@ -10489,24 +10557,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAdd_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAdd_ImmediateToA
 							}
 						},
 						/* Y = 1 */
@@ -10514,24 +10582,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAddCarry_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAddCarry_ImmediateToA
 							}
 						},
 						/* Y = 2 */
@@ -10539,24 +10607,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operSub_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operSub_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operSub_ImmediateToA
 							}
 						},
 						/* Y = 3 */
@@ -10564,24 +10632,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operSubCarry_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operSubCarry_ImmediateToA
 							}
 						},
 						/* Y = 4 */
@@ -10589,24 +10657,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operAnd_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operAnd_ImmediateToA
 							}
 						},
 						/* Y = 5 */
@@ -10614,24 +10682,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operXor_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operXor_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operXor_ImmediateToA
 							}
 						},
 						/* Y = 6 */
@@ -10639,24 +10707,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operOr_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operOr_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operOr_ImmediateToA
 							}
 						},
 						/* Y = 7 */
@@ -10664,24 +10732,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operCp_ImmediateToA
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 1 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 2 */
-								&OperNop,
+								&operCp_ImmediateToA,
 								/* P = 3 */
-								&OperNop
+								&operCp_ImmediateToA
 							}
 						}
 					},
