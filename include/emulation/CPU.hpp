@@ -752,9 +752,44 @@ namespace GBMU_NAMESPACE {
 				operBaseRelativeJump(jumpTo, rcp, c);
 		}
 
+		template <class Regs, class Mem, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseCall(Regs& regs, Mem& mem, Opcode& op, Chrono& c)
+		{
+			operBasePush(*reinterpret_cast<const uint16_t*>(op.getNextOpcode()), regs.sp, mem, c);
+			operBaseAbsoluteJump(op.getImmediateData16b(), regs.cp, c);
+			c.setCycles(cycles);
+		}
 
+		template <class Regs, class Mem, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseConditionalCall(Regs& regs, Mem& mem, bool cond, Opcode& op, Chrono& c)
+		{
+			if (cond)
+				operBaseCall<cycles>(regs, mem, op, c);
+		}
 
+		template <class Regs, class Mem, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseRet(Regs& regs, Mem& mem, Chrono& c)
+		{
+			uint16_t retAddr;
+			operBasePop(retAddr, regs.sp, mem, c);
+			operBaseAbsoluteJump(retAddr, regs.cp, c);
+			c.setCycles(cycles);
+		}
 
+		template <class Regs, class Mem, int64_t cycles = 8>
+		static inline void
+		__attribute__ ((always_inline))
+		operBaseConditionalRet(Regs& regs, Mem& mem, bool cond, Chrono& c)
+		{
+			if (cond)
+				operBaseRet<cycles>(regs, mem, c);
+		}
 
 
 
@@ -2485,6 +2520,43 @@ namespace GBMU_NAMESPACE {
 			operBasePop<0XC>(core.regs.af, core.regs.sp, core.memory, c);
 		}
 
+		///////////////////////////////
+		// CONDITIONAL RET OPERATION //
+		///////////////////////////////
+
+		/// Opcode: 0XC0, cycles: 8 ( RET NZ )
+		static void
+		operRet_NZ(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseConditionalRet<0X8>(core.regs, core.memory, !FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c);
+		}
+
+		/// Opcode: 0XC8, cycles: 8 ( RET Z )
+		static void
+		operRet_Z(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseConditionalRet<0X8>(core.regs, core.memory, FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), c);
+		}
+
+		/// Opcode: 0XD0, cycles: 8 ( RET NC )
+		static void
+		operRet_NC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseConditionalRet<0X8>(core.regs, core.memory, !FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c);
+		}
+
+		/// Opcode: 0XD8, cycles: 8 ( RET C )
+		static void
+		operRet_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{
+			static_cast<void>(op);
+			operBaseConditionalRet<0X8>(core.regs, core.memory, FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), c);
+		}
+
+
 		///////////////////
 		// RET OPERATION //
 		///////////////////
@@ -2498,11 +2570,7 @@ namespace GBMU_NAMESPACE {
 		operRet(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{
 			static_cast<void>(op);
-
-			uint16_t retAddr;
-			operBasePop(retAddr, core.regs.sp, core.memory, c);
-			operBaseAbsoluteJump(retAddr, core.regs.cp, c);
-			c.setCycles(8);
+			operBaseRet<0X8>(core.regs, core.memory, c);
 		}
 
 		//////////////////////////////////////////
@@ -2542,6 +2610,30 @@ namespace GBMU_NAMESPACE {
 		static void
 		OperJp(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
 		{ operBaseAbsoluteJump<0XC>(op.getImmediateData16b(), core.regs.cp, c); }
+
+		////////////////////////////////
+		// CONDITIONAL CALL OPERATION //
+		////////////////////////////////
+
+		/// Opcode: OXC4, cycles: 12 ( CALL NZ )
+		static void
+		operCall_NZ(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseConditionalCall<0XC>(core.regs, core.memory, !FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), op, c); }
+
+		/// Opcode: 0XCC, cycles: 12 ( CALL Z )
+		static void
+		operCall_Z(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseConditionalCall<0XC>(core.regs, core.memory, FGMASK_HAS(core.flags, Z80Flags::FLAG_ZERO), op, c); }
+
+		/// Opcode: 0XD4, cycles: 12 ( CALL NC )
+		static void
+		operCall_NC(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseConditionalCall<0XC>(core.regs, core.memory, !FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), op, c); }
+
+		/// Opcode: OXDC, cycles: 12 ( CALL C )
+		static void
+		operCall_C(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
+		{ operBaseConditionalCall<0XC>(core.regs, core.memory, FGMASK_HAS(core.flags, Z80Flags::FLAG_CARRY), op, c); }
 
 		/////////////////////
 		// PUSH OPERATIONS //
@@ -2589,11 +2681,7 @@ namespace GBMU_NAMESPACE {
 		/// Opcode: 0XCD, cycles: 12
 		static void
 		operCall(CPU<Memory, Z80Registers, uint8_t>& core, Chrono& c, Opcode& op)
-		{
-			operBasePush(*reinterpret_cast<const uint16_t*>(op.getNextOpcode()), core.regs.sp, core.memory, c);
-			operBaseAbsoluteJump(op.getImmediateData16b(), core.regs.cp, c);
-			c.setCycles(12);
-		}
+		{  operBaseCall<0XC>(core.regs, core.memory, op, c); }
 
 //
 ///TODO: Document those
@@ -9598,24 +9686,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 3 */
-								&OperNop
+								&operRet_NZ
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operRet_NZ,
 								/* P = 3 */
-								&OperNop
+								&operRet_NZ
 							}
 						},
 						/* Y = 1 */
@@ -9623,24 +9711,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 1 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 2 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 3 */
-								&OperNop
+								&operRet_Z
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 1 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 2 */
-								&OperNop,
+								&operRet_Z,
 								/* P = 3 */
-								&OperNop
+								&operRet_Z
 							}
 						},
 						/* Y = 2 */
@@ -9648,24 +9736,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 1 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 2 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 3 */
-								&OperNop
+								&operRet_NC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 1 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 2 */
-								&OperNop,
+								&operRet_NC,
 								/* P = 3 */
-								&OperNop
+								&operRet_NC
 							}
 						},
 						/* Y = 3 */
@@ -9673,24 +9761,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_C,
 								/* P = 1 */
-								&OperNop,
+								&operRet_C,
 								/* P = 2 */
-								&OperNop,
+								&operRet_C,
 								/* P = 3 */
-								&OperNop
+								&operRet_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operRet_C,
 								/* P = 1 */
-								&OperNop,
+								&operRet_C,
 								/* P = 2 */
-								&OperNop,
+								&operRet_C,
 								/* P = 3 */
-								&OperNop
+								&operRet_C
 							}
 						},
 						/* Y = 4 */
@@ -10410,24 +10498,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 3 */
-								&OperNop
+								&operCall_NZ
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 1 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 2 */
-								&OperNop,
+								&operCall_NZ,
 								/* P = 3 */
-								&OperNop
+								&operCall_NZ
 							}
 						},
 						/* Y = 1 */
@@ -10435,24 +10523,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 1 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 2 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 3 */
-								&OperNop
+								&operCall_Z
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 1 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 2 */
-								&OperNop,
+								&operCall_Z,
 								/* P = 3 */
-								&OperNop
+								&operCall_Z
 							}
 						},
 						/* Y = 2 */
@@ -10460,24 +10548,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 1 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 2 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 3 */
-								&OperNop
+								&operCall_NC
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 1 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 2 */
-								&OperNop,
+								&operCall_NC,
 								/* P = 3 */
-								&OperNop
+								&operCall_NC
 							}
 						},
 						/* Y = 3 */
@@ -10485,24 +10573,24 @@ namespace GBMU_NAMESPACE {
 							/* Q = 0 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_C,
 								/* P = 1 */
-								&OperNop,
+								&operCall_C,
 								/* P = 2 */
-								&OperNop,
+								&operCall_C,
 								/* P = 3 */
-								&OperNop
+								&operCall_C
 							},
 							/* Q = 1 */
 							{
 								/* P = 0 */
-								&OperNop,
+								&operCall_C,
 								/* P = 1 */
-								&OperNop,
+								&operCall_C,
 								/* P = 2 */
-								&OperNop,
+								&operCall_C,
 								/* P = 3 */
-								&OperNop
+								&operCall_C
 							}
 						},
 						/* Y = 4 */
